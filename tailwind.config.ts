@@ -17,6 +17,10 @@ export default {
 				'2xl': '1400px'
 			}
 		},
+		fontFamily: {
+			sans: ['Inter', 'system-ui', 'sans-serif'],
+			serif: ['Playfair Display', 'Georgia', 'serif'],
+		},
 		extend: {
 			colors: {
 				border: 'hsl(var(--border))',
@@ -61,6 +65,25 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Book recommendation app colors
+				book: {
+					purple: {
+						light: '#D6BCFA',
+						DEFAULT: '#9b87f5',
+						dark: '#7E69AB',
+						darker: '#6E59A5',
+						deepDark: '#1A1F2C'
+					},
+					neutral: '#8E9196',
+					softGreen: '#F2FCE2',
+					softYellow: '#FEF7CD',
+					softOrange: '#FEC6A1',
+					softPurple: '#E5DEFF',
+					softPink: '#FFDEE2',
+					softPeach: '#FDE1D3',
+					softBlue: '#D3E4FD',
+					softGray: '#F1F0FB'
 				}
 			},
 			borderRadius: {
