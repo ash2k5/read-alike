@@ -68,9 +68,14 @@ export function useUserProfile() {
     }
   };
 
+  const updateFavoriteGenres = async (genres: string[]) => {
+    return updateProfile({ favorite_genres: genres });
+  };
+
   return {
     profile,
     loading,
-    updateProfile
+    updateProfile,
+    updateFavoriteGenres
   };
 }
