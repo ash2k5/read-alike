@@ -4,6 +4,7 @@ export type UserProfile = {
   email: string;
   username: string;
   avatar_url?: string;
+  favorite_genres?: string[];
   created_at: string;
 };
 
