@@ -112,6 +112,20 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out'
+			},
+			scale: {
+				'102': '1.02',
+			},
+			spacing: {
+				'3.5': '0.875rem',
+				'4.5': '1.125rem',
+				'5.5': '1.375rem',
+			},
+			transitionTimingFunction: {
+				'bounce-sm': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+			},
+			animation: {
+				'fadeIn': 'fadeIn 0.3s ease-out forwards',
 			}
 		}
 	},

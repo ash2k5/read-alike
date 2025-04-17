@@ -15,33 +15,33 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
   
   if (variant === "horizontal") {
     return (
-      <div className="flex items-start space-x-4 p-4 rounded-lg border border-gray-200 transition-all duration-200 hover:shadow-md bg-white">
-        <div className="flex-shrink-0">
+      <div className="group fade-in flex items-start space-x-6 p-5 rounded-xl border border-gray-200 transition-all duration-300 hover:shadow-lg hover:border-book-purple/30 bg-white">
+        <div className="flex-shrink-0 overflow-hidden rounded-lg">
           <Link to={`/book/${book.id}`}>
             <img 
               src={book.cover} 
               alt={book.title} 
-              className="w-24 h-36 object-cover rounded-md shadow-sm" 
+              className="w-28 h-40 object-cover transition-transform duration-300 group-hover:scale-105" 
             />
           </Link>
         </div>
         <div className="flex-1 min-w-0">
           <Link to={`/book/${book.id}`}>
-            <h3 className="text-lg font-semibold text-gray-900 truncate hover:text-book-purple-dark">{book.title}</h3>
+            <h3 className="text-xl font-serif font-semibold text-gray-900 mb-1 hover:text-book-purple smooth-transition">{book.title}</h3>
           </Link>
-          <p className="text-sm text-gray-600">{book.author}</p>
-          <div className="mt-1">
-            <Rating value={book.rating} showValue />
+          <p className="text-base text-gray-600 mb-2">{book.author}</p>
+          <div className="mb-3">
+            <Rating value={book.rating} showValue size="md" />
           </div>
-          <p className="mt-2 text-sm text-gray-500 line-clamp-2">{book.description}</p>
+          <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{book.description}</p>
         </div>
         <button
           onClick={() => setIsFavorite(!isFavorite)}
-          className="p-2 rounded-full hover:bg-gray-100"
+          className="p-2 rounded-full hover:bg-gray-100 smooth-transition"
         >
           <Heart
-            size={20}
-            className={isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}
+            size={22}
+            className={`smooth-transition ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
           />
         </button>
       </div>
@@ -49,35 +49,35 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
   }
   
   return (
-    <div className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-200 hover:shadow-md">
-      <div className="absolute top-2 right-2 z-10">
+    <div className="group fade-in relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:shadow-lg hover:border-book-purple/30">
+      <div className="absolute top-3 right-3 z-10">
         <button
           onClick={() => setIsFavorite(!isFavorite)}
-          className="p-1.5 rounded-full bg-white/80 backdrop-blur-sm hover:bg-white"
+          className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white smooth-transition"
         >
           <Heart
-            size={18}
-            className={isFavorite ? "fill-red-500 text-red-500" : "text-gray-500"}
+            size={20}
+            className={`smooth-transition ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-500"}`}
           />
         </button>
       </div>
       
-      <Link to={`/book/${book.id}`} className="flex h-48 overflow-hidden">
+      <Link to={`/book/${book.id}`} className="flex h-56 overflow-hidden">
         <img
           src={book.cover}
           alt={book.title}
-          className="object-cover w-full transition-transform duration-300 hover:scale-105"
+          className="object-cover w-full transition-transform duration-500 group-hover:scale-110"
         />
       </Link>
       
       <div className="flex flex-col flex-1 p-4">
         <Link to={`/book/${book.id}`}>
-          <h3 className="font-medium text-gray-900 hover:text-book-purple truncate">{book.title}</h3>
+          <h3 className="font-serif font-medium text-gray-900 hover:text-book-purple truncate smooth-transition">{book.title}</h3>
         </Link>
         <p className="text-sm text-gray-600 mt-1">{book.author}</p>
-        <div className="mt-auto pt-3 flex items-center justify-between">
+        <div className="mt-auto pt-4 flex items-center justify-between">
           <Rating value={book.rating} size="sm" />
-          <span className="text-xs text-gray-500">{book.year}</span>
+          <span className="text-xs text-gray-500 font-medium">{book.year}</span>
         </div>
       </div>
     </div>
