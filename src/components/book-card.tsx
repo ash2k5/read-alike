@@ -1,5 +1,8 @@
-import { Book, Heart } from "lucide-react";
+
+import { Book as BookIcon } from "lucide-react";
+import { Book } from "@/types";
 import { Rating } from "@/components/ui/rating";
+import { Heart } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -16,7 +19,7 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
     return (
       <div className="flex items-center justify-center w-full h-full bg-gray-100 text-gray-400">
         <div className="text-center p-4">
-          <Book className="mx-auto mb-2" size={24} />
+          <BookIcon className="mx-auto mb-2" size={24} />
           <p className="text-xs line-clamp-2 text-gray-500">{book.title}</p>
         </div>
       </div>
