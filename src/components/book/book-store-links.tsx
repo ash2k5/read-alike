@@ -8,10 +8,16 @@ interface BookStoreLinksProps {
 }
 
 export function BookStoreLinks({ book }: BookStoreLinksProps) {
+  // Generate Amazon link, using the existing link if available, otherwise create a new one
+  const amazonLink = book.amazonLink || generateAmazonLink(book.title, book.author);
+  
+  // Generate Kindle link
+  const kindleLink = generateKindleLink(book.title, book.author);
+  
   return (
     <div className="flex flex-wrap gap-3 mt-6">
       <a
-        href={book.amazonLink || generateAmazonLink(book.title, book.author)}
+        href={amazonLink}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center bg-book-purple hover:bg-book-purple-dark text-white font-medium px-5 py-2.5 rounded-lg transition"
@@ -21,7 +27,7 @@ export function BookStoreLinks({ book }: BookStoreLinksProps) {
       </a>
       
       <a
-        href={generateKindleLink(book.title, book.author)}
+        href={kindleLink}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center border border-book-purple bg-white text-book-purple hover:bg-book-purple/10 font-medium px-5 py-2.5 rounded-lg transition"
