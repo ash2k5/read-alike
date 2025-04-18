@@ -5,7 +5,7 @@ import { BookGrid } from "@/components/book-grid";
 import { GenreSelector } from "@/components/genre-selector";
 import { books, genres } from "@/data/mockData";
 import { Book, Genre } from "@/types";
-import { searchBooks, getBooksByGenre } from "@/lib/bookApi";
+import { searchBooks, getBooksByGenre, getMoreBooks, getMoreBooksByGenre } from "@/lib/bookApi";
 import { 
   Pagination, 
   PaginationContent, 
@@ -22,77 +22,117 @@ const Browse = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
   const booksPerPage = 20;
+  const [loadingMore, setLoadingMore] = useState(false);
   
-  useEffect(() => {
-    async function fetchBooks() {
-      setLoading(true);
-      try {
-        if (selectedGenreId) {
-          const genre = genres.find(g => g.id === selectedGenreId);
-          setSelectedGenre(genre);
+  const fetchBooks = async (page: number = 1) => {
+    const startIndex = (page - 1) * booksPerPage;
+    setLoading(true);
+    
+    try {
+      if (selectedGenreId) {
+        const genre = genres.find(g => g.id === selectedGenreId);
+        setSelectedGenre(genre);
+        
+        // Try to fetch from API first
+        if (genre) {
+          let apiBooks: Book[] = [];
           
-          // Try to fetch from API first
-          if (genre) {
-            const apiBooks = await getBooksByGenre(genre.name);
-            
-            if (apiBooks && apiBooks.length > 0) {
-              setFilteredBooks(apiBooks);
-              setTotalPages(Math.ceil(apiBooks.length / booksPerPage));
-              setLoading(false);
-              return;
-            }
+          if (page === 1) {
+            apiBooks = await getBooksByGenre(genre.name, 0, booksPerPage);
+          } else {
+            apiBooks = await getMoreBooksByGenre(genre.name, startIndex, booksPerPage);
           }
           
-          // Fallback to mock data if API fails
-          const filtered = books.filter(book => 
-            book.genre.some(g => g.id === selectedGenreId)
-          );
-          setFilteredBooks(filtered);
-          setTotalPages(Math.ceil(filtered.length / booksPerPage));
-        } else {
-          setSelectedGenre(undefined);
-          
-          // Try to fetch popular books from API
-          const apiBooks = await searchBooks("subject:fiction&orderBy=relevance&maxResults=40");
-          
           if (apiBooks && apiBooks.length > 0) {
-            setFilteredBooks(apiBooks);
-            setTotalPages(Math.ceil(apiBooks.length / booksPerPage));
+            if (page === 1) {
+              setFilteredBooks(apiBooks);
+            } else {
+              setFilteredBooks(prev => [...prev, ...apiBooks]);
+            }
+            setTotalBooks(Math.max(apiBooks.length + startIndex, totalBooks));
+            setTotalPages(Math.ceil((apiBooks.length + startIndex) / booksPerPage));
             setLoading(false);
             return;
           }
-          
-          // Fallback to mock data
-          setFilteredBooks(books);
-          setTotalPages(Math.ceil(books.length / booksPerPage));
         }
-      } catch (error) {
-        console.error("Error fetching books:", error);
-        // Fallback to mock data
-        if (selectedGenreId) {
-          const filtered = books.filter(book => 
-            book.genre.some(g => g.id === selectedGenreId)
-          );
-          setFilteredBooks(filtered);
-          setTotalPages(Math.ceil(filtered.length / booksPerPage));
+        
+        // Fallback to mock data if API fails
+        const filtered = books.filter(book => 
+          book.genre.some(g => g.id === selectedGenreId)
+        );
+        setFilteredBooks(filtered);
+        setTotalBooks(filtered.length);
+        setTotalPages(Math.ceil(filtered.length / booksPerPage));
+      } else {
+        setSelectedGenre(undefined);
+        
+        // Try to fetch popular books from API
+        let apiBooks: Book[] = [];
+        const searchQuery = "subject:fiction&orderBy=relevance";
+        
+        if (page === 1) {
+          apiBooks = await searchBooks(searchQuery, 0, booksPerPage);
         } else {
-          setFilteredBooks(books);
-          setTotalPages(Math.ceil(books.length / booksPerPage));
+          apiBooks = await getMoreBooks(searchQuery, startIndex, booksPerPage);
         }
-      } finally {
-        setLoading(false);
+        
+        if (apiBooks && apiBooks.length > 0) {
+          if (page === 1) {
+            setFilteredBooks(apiBooks);
+          } else {
+            setFilteredBooks(prev => [...prev, ...apiBooks]);
+          }
+          setTotalBooks(Math.max(apiBooks.length + startIndex, totalBooks));
+          setTotalPages(Math.ceil((apiBooks.length + startIndex) / booksPerPage));
+          setLoading(false);
+          return;
+        }
+        
+        // Fallback to mock data
+        setFilteredBooks(books);
+        setTotalBooks(books.length);
+        setTotalPages(Math.ceil(books.length / booksPerPage));
       }
+    } catch (error) {
+      console.error("Error fetching books:", error);
+      // Fallback to mock data
+      if (selectedGenreId) {
+        const filtered = books.filter(book => 
+          book.genre.some(g => g.id === selectedGenreId)
+        );
+        setFilteredBooks(filtered);
+        setTotalBooks(filtered.length);
+        setTotalPages(Math.ceil(filtered.length / booksPerPage));
+      } else {
+        setFilteredBooks(books);
+        setTotalBooks(books.length);
+        setTotalPages(Math.ceil(books.length / booksPerPage));
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
-    
-    fetchBooks();
-    setCurrentPage(1); // Reset to first page when changing genre
+  };
+  
+  // Initial fetch when genre changes
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchBooks(1);
   }, [selectedGenreId]);
   
-  // Calculate current page slice of books
-  const indexOfLastBook = currentPage * booksPerPage;
-  const indexOfFirstBook = indexOfLastBook - booksPerPage;
-  const currentBooks = filteredBooks.slice(indexOfFirstBook, indexOfLastBook);
+  // Load more books when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      setLoadingMore(true);
+      fetchBooks(currentPage);
+    }
+  }, [currentPage]);
+  
+  const handleLoadMore = () => {
+    setCurrentPage(prev => prev + 1);
+  };
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,23 +151,24 @@ const Browse = () => {
             </div>
             
             <div className="text-sm text-gray-500">
-              Showing {currentBooks.length} of {filteredBooks.length} books
+              Showing {filteredBooks.length} book{filteredBooks.length !== 1 ? 's' : ''}
+              {totalBooks > filteredBooks.length ? ` of ${totalBooks}+ total` : ''}
             </div>
           </div>
           
-          {loading ? (
+          {loading && currentPage === 1 ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-book-purple"></div>
             </div>
           ) : (
             <>
               <BookGrid 
-                books={currentBooks} 
+                books={filteredBooks} 
                 title={selectedGenre ? `${selectedGenre.name} Books` : "All Books"}
                 variant="default"
               />
               
-              {filteredBooks.length === 0 && (
+              {filteredBooks.length === 0 && !loading && (
                 <div className="text-center py-12">
                   <p className="text-gray-500 mb-4">No books found in this genre.</p>
                   <button 
@@ -139,6 +180,27 @@ const Browse = () => {
                 </div>
               )}
               
+              {/* Load More Button */}
+              {filteredBooks.length > 0 && filteredBooks.length < totalBooks && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="bg-book-purple hover:bg-book-purple-dark text-white px-5 py-2 rounded-md transition disabled:opacity-70"
+                  >
+                    {loadingMore ? (
+                      <span className="flex items-center">
+                        <span className="inline-block h-4 w-4 mr-2 border-t-2 border-b-2 border-white rounded-full animate-spin"></span>
+                        Loading...
+                      </span>
+                    ) : (
+                      'Load More Books'
+                    )}
+                  </button>
+                </div>
+              )}
+              
+              {/* Pagination (optional, can be used in addition to Load More) */}
               {filteredBooks.length > booksPerPage && (
                 <div className="mt-8">
                   <Pagination>
