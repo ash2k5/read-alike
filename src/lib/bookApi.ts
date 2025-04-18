@@ -41,10 +41,10 @@ export const generateKindleLink = (title: string, author?: string): string => {
   return `https://www.amazon.com/s?k=${searchQuery}&i=digital-text`;
 };
 
-// Search books by query
-export const searchBooks = async (query: string): Promise<Book[]> => {
+// Search books by query with pagination support
+export const searchBooks = async (query: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
   try {
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&maxResults=40`);
+    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&startIndex=${startIndex}&maxResults=${maxResults}`);
     const data = await response.json();
     
     if (!data.items) return [];
@@ -71,10 +71,10 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
   }
 };
 
-// Get books by genre/category
-export const getBooksByGenre = async (genre: string): Promise<Book[]> => {
+// Get books by genre/category with pagination support
+export const getBooksByGenre = async (genre: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
   try {
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(genre)}&maxResults=40`);
+    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(genre)}&startIndex=${startIndex}&maxResults=${maxResults}`);
     const data = await response.json();
     
     if (!data.items) return [];
@@ -131,4 +131,14 @@ export const getSimilarBooks = async (book: Book): Promise<Book[]> => {
     console.error('Error fetching similar books:', error);
     return [];
   }
+};
+
+// Get more books for pagination (load next page)
+export const getMoreBooks = async (query: string, startIndex: number, maxResults: number = 40): Promise<Book[]> => {
+  return searchBooks(query, startIndex, maxResults);
+};
+
+// Get more books by genre for pagination
+export const getMoreBooksByGenre = async (genre: string, startIndex: number, maxResults: number = 40): Promise<Book[]> => {
+  return getBooksByGenre(genre, startIndex, maxResults);
 };
