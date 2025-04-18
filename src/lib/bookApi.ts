@@ -1,4 +1,3 @@
-
 import { Book, Genre } from '@/types';
 
 // Google Books API base URL
@@ -41,15 +40,28 @@ export const generateKindleLink = (title: string, author?: string): string => {
   return `https://www.amazon.com/s?k=${searchQuery}&i=digital-text`;
 };
 
-// Search books by query with pagination support
+// Search books by query with pagination support, focusing on Kindle editions
 export const searchBooks = async (query: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
   try {
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&startIndex=${startIndex}&maxResults=${maxResults}`);
+    // Add informat:epub to target digital/ebook formats
+    const kindleQuery = `${encodeURIComponent(query)} informat:epub`;
+    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
     const data = await response.json();
     
     if (!data.items) return [];
     
-    return data.items.map(mapGoogleBookToBook);
+    // Filter out books without buyLinks or that aren't available as ebooks
+    return data.items
+      .filter((item: any) => {
+        const volumeInfo = item.volumeInfo;
+        const saleInfo = item.saleInfo;
+        return volumeInfo && (
+          saleInfo?.isEbook === true || 
+          volumeInfo.readingModes?.epub === true ||
+          volumeInfo.readingModes?.pdf === true
+        );
+      })
+      .map(mapGoogleBookToBook);
   } catch (error) {
     console.error('Error searching books:', error);
     return [];
@@ -71,15 +83,28 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
   }
 };
 
-// Get books by genre/category with pagination support
+// Get books by genre/category with pagination support, focusing on Kindle editions
 export const getBooksByGenre = async (genre: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
   try {
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(genre)}&startIndex=${startIndex}&maxResults=${maxResults}`);
+    // Add informat:epub to target digital/ebook formats
+    const kindleQuery = `subject:${encodeURIComponent(genre)} informat:epub`;
+    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
     const data = await response.json();
     
     if (!data.items) return [];
     
-    return data.items.map(mapGoogleBookToBook);
+    // Filter out books without buyLinks or that aren't available as ebooks
+    return data.items
+      .filter((item: any) => {
+        const volumeInfo = item.volumeInfo;
+        const saleInfo = item.saleInfo;
+        return volumeInfo && (
+          saleInfo?.isEbook === true || 
+          volumeInfo.readingModes?.epub === true ||
+          volumeInfo.readingModes?.pdf === true
+        );
+      })
+      .map(mapGoogleBookToBook);
   } catch (error) {
     console.error('Error fetching books by genre:', error);
     return [];

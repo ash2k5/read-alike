@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { BookGrid } from "@/components/book-grid";
@@ -13,27 +12,32 @@ const Search = () => {
   const [searchResults, setSearchResults] = useState<Book[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!query && !selectedGenreId) {
       setSearchResults([]);
       setHasSearched(false);
       return;
     }
     
-    const results = books.filter(book => {
-      const matchesQuery = !query || 
-        book.title.toLowerCase().includes(query.toLowerCase()) ||
-        book.author.toLowerCase().includes(query.toLowerCase()) ||
-        book.description.toLowerCase().includes(query.toLowerCase());
-        
-      const matchesGenre = !selectedGenreId || 
-        book.genre.some(g => g.id === selectedGenreId);
-        
-      return matchesQuery && matchesGenre;
-    });
-    
-    setSearchResults(results);
-    setHasSearched(true);
+    try {
+      let results: Book[] = [];
+      
+      if (query) {
+        results = await searchBooks(query);
+      } else if (selectedGenreId) {
+        const genre = genres.find(g => g.id === selectedGenreId);
+        if (genre) {
+          results = await getBooksByGenre(genre.name);
+        }
+      }
+      
+      setSearchResults(results);
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Error searching books:', error);
+      setSearchResults([]);
+      setHasSearched(true);
+    }
   };
   
   return (
