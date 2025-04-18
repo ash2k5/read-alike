@@ -1,7 +1,5 @@
-
-import { Book } from "@/types";
+import { Book, Heart } from "lucide-react";
 import { Rating } from "@/components/ui/rating";
-import { Heart, BookClosed } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,12 +12,11 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
   
-  // Fallback image - placeholder with book title
   const fallbackImage = () => {
     return (
       <div className="flex items-center justify-center w-full h-full bg-gray-100 text-gray-400">
         <div className="text-center p-4">
-          <BookClosed className="mx-auto mb-2" size={24} />
+          <Book className="mx-auto mb-2" size={24} />
           <p className="text-xs line-clamp-2 text-gray-500">{book.title}</p>
         </div>
       </div>
