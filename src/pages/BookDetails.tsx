@@ -1,36 +1,86 @@
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/navbar";
 import { Rating } from "@/components/ui/rating";
 import { BookGrid } from "@/components/book-grid";
 import { Book } from "@/types";
 import { books } from "@/data/mockData";
-import { ArrowLeft, Heart, ExternalLink, Share2 } from "lucide-react";
+import { ArrowLeft, Heart, Share2 } from "lucide-react";
+import { getBookById, getSimilarBooks } from "@/lib/bookApi";
+import { BookStoreLinks } from "@/components/book/book-store-links";
+import { toast } from "@/components/ui/sonner";
 
 const BookDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [book, setBook] = useState<Book | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [similarBooks, setSimilarBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Find the book by ID
-    const foundBook = books.find(b => b.id === id);
-    setBook(foundBook || null);
-    
-    // Get similar books (same genre, different book)
-    if (foundBook) {
-      const genreIds = foundBook.genre.map(g => g.id);
-      const similar = books
-        .filter(b => 
-          b.id !== foundBook.id && 
-          b.genre.some(g => genreIds.includes(g.id))
-        )
-        .slice(0, 5);
-      setSimilarBooks(similar);
+    async function fetchBookDetails() {
+      setLoading(true);
+      
+      try {
+        // Try to fetch from Google Books API first
+        if (id) {
+          const apiBook = await getBookById(id);
+          
+          if (apiBook) {
+            setBook(apiBook);
+            
+            // Get similar books
+            const similar = await getSimilarBooks(apiBook);
+            setSimilarBooks(similar);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback to mock data if API fetch fails
+        const foundBook = books.find(b => b.id === id);
+        setBook(foundBook || null);
+        
+        // Get similar books from mock data
+        if (foundBook) {
+          const genreIds = foundBook.genre.map(g => g.id);
+          const similar = books
+            .filter(b => 
+              b.id !== foundBook.id && 
+              b.genre.some(g => genreIds.includes(g.id))
+            )
+            .slice(0, 5);
+          setSimilarBooks(similar);
+        }
+      } catch (error) {
+        console.error("Error fetching book details:", error);
+        toast.error("Failed to load book details");
+        
+        // Fallback to mock data
+        const foundBook = books.find(b => b.id === id);
+        setBook(foundBook || null);
+      } finally {
+        setLoading(false);
+      }
     }
+    
+    fetchBookDetails();
   }, [id]);
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-book-purple"></div>
+          </div>
+        </main>
+      </div>
+    );
+  }
   
   if (!book) {
     return (
@@ -56,10 +106,13 @@ const BookDetails = () => {
       <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back button */}
         <div className="mb-6">
-          <Link to="/" className="inline-flex items-center text-gray-600 hover:text-book-purple">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="inline-flex items-center text-gray-600 hover:text-book-purple"
+          >
             <ArrowLeft size={16} className="mr-1" />
-            <span>Back to Home</span>
-          </Link>
+            <span>Back</span>
+          </button>
         </div>
         
         {/* Book details */}
@@ -90,7 +143,13 @@ const BookDetails = () => {
                     {isFavorite ? "Saved" : "Save"}
                   </button>
                   
-                  <button className="bg-gray-100 text-gray-700 hover:bg-gray-200 p-2 rounded-full">
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success('Link copied to clipboard');
+                    }}
+                    className="bg-gray-100 text-gray-700 hover:bg-gray-200 p-2 rounded-full"
+                  >
                     <Share2 size={16} />
                   </button>
                 </div>
@@ -103,7 +162,7 @@ const BookDetails = () => {
                 
                 <div className="flex items-center mb-6">
                   <Rating value={book.rating} showValue size="lg" />
-                  <span className="ml-2 text-gray-500 text-sm">({book.reviews.length} reviews)</span>
+                  <span className="ml-2 text-gray-500 text-sm">({book.reviews?.length || 0} reviews)</span>
                 </div>
                 
                 <div className="mb-6">
@@ -126,16 +185,8 @@ const BookDetails = () => {
                   </div>
                 </div>
                 
-                <div className="mt-8">
-                  <a
-                    href={book.amazonLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center bg-book-purple hover:bg-book-purple-dark text-white font-medium px-6 py-3 rounded-lg transition"
-                  >
-                    View on Amazon <ExternalLink size={16} className="ml-2" />
-                  </a>
-                </div>
+                {/* Store links - using our new component */}
+                <BookStoreLinks book={book} />
               </div>
             </div>
           </div>
@@ -145,7 +196,7 @@ const BookDetails = () => {
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Reviews</h2>
           
-          {book.reviews.length > 0 ? (
+          {book.reviews && book.reviews.length > 0 ? (
             <div className="space-y-6">
               {book.reviews.map(review => (
                 <div key={review.id} className="bg-white p-6 rounded-xl shadow-sm">
@@ -178,6 +229,7 @@ const BookDetails = () => {
             <BookGrid 
               books={similarBooks} 
               title="Similar Books You Might Enjoy" 
+              description="Based on this book's genre and author"
               variant="default"
             />
           </section>

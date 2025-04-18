@@ -1,21 +1,49 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { BookGrid } from "@/components/book-grid";
 import { GenreSelector } from "@/components/genre-selector";
-import { books, topReadsThisMonth, recommendedForYou } from "@/data/mockData";
+import { books, topReadsThisMonth } from "@/data/mockData";
 import { ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { searchBooks } from "@/lib/bookApi";
+import { useRecommendations } from "@/hooks/useRecommendations";
+import { Book } from "@/types";
 
 const Index = () => {
   const [selectedGenreId, setSelectedGenreId] = useState<string | undefined>(undefined);
+  const [trendingBooks, setTrendingBooks] = useState<Book[]>(topReadsThisMonth);
+  const [isLoadingTrending, setIsLoadingTrending] = useState(false);
+  const { recommendations, loading: isLoadingRecommendations } = useRecommendations();
+  
+  // Fetch trending books once on component mount
+  useEffect(() => {
+    async function fetchTrendingBooks() {
+      setIsLoadingTrending(true);
+      try {
+        // Try to get trending books from Google Books API
+        const apiBooks = await searchBooks("subject:fiction&orderBy=newest");
+        
+        if (apiBooks && apiBooks.length > 0) {
+          setTrendingBooks(apiBooks.slice(0, 10));
+        }
+      } catch (error) {
+        console.error("Error fetching trending books:", error);
+        // Fallback to mock data (already set as initial state)
+      } finally {
+        setIsLoadingTrending(false);
+      }
+    }
+    
+    fetchTrendingBooks();
+  }, []);
   
   // Filter top reads if genre is selected
   const filteredTopReads = selectedGenreId 
-    ? topReadsThisMonth.filter(book => 
+    ? trendingBooks.filter(book => 
         book.genre.some(g => g.id === selectedGenreId)
       )
-    : topReadsThisMonth;
+    : trendingBooks;
     
   return (
     <div className="min-h-screen bg-gray-50">
@@ -52,10 +80,16 @@ const Index = () => {
             </Link>
           </div>
           
-          <BookGrid 
-            books={filteredTopReads.length > 0 ? filteredTopReads : []} 
-            variant="default" 
-          />
+          {isLoadingTrending ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-book-purple"></div>
+            </div>
+          ) : (
+            <BookGrid 
+              books={filteredTopReads.length > 0 ? filteredTopReads : []} 
+              variant="default" 
+            />
+          )}
           
           {filteredTopReads.length === 0 && selectedGenreId && (
             <p className="text-center text-gray-500 mt-4">
@@ -73,7 +107,14 @@ const Index = () => {
         {/* Personalized Recommendations Section */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Recommended For You</h2>
-          <BookGrid books={recommendedForYou} variant="default" />
+          
+          {isLoadingRecommendations ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-book-purple"></div>
+            </div>
+          ) : (
+            <BookGrid books={recommendations.length > 0 ? recommendations : books.slice(0, 5)} variant="default" />
+          )}
         </section>
         
         {/* Join Community CTA */}
@@ -83,9 +124,9 @@ const Index = () => {
             <p className="text-book-purple-light mb-6">
               Create an account to get personalized book recommendations, track your reading, and connect with fellow book lovers.
             </p>
-            <button className="bg-white text-book-purple-dark font-medium py-2 px-6 rounded-full hover:bg-gray-100 transition">
+            <Link to="/register" className="bg-white text-book-purple-dark font-medium py-2 px-6 rounded-full hover:bg-gray-100 transition">
               Sign Up Now
-            </button>
+            </Link>
           </div>
         </section>
       </main>
