@@ -28,7 +28,9 @@ export function useRecommendations() {
           
           // Get books from this genre
           const genreBooks = await getBooksByGenre(randomGenre);
-          recommendedBooks = [...recommendedBooks, ...genreBooks];
+          if (genreBooks.length > 0) {
+            recommendedBooks = [...recommendedBooks, ...genreBooks];
+          }
         }
         
         // Get books the user has read
@@ -44,7 +46,9 @@ export function useRecommendations() {
           
           if (randomBook) {
             const similarBooks = await getSimilarBooks(randomBook);
-            recommendedBooks = [...recommendedBooks, ...similarBooks];
+            if (similarBooks.length > 0) {
+              recommendedBooks = [...recommendedBooks, ...similarBooks];
+            }
           }
         }
         

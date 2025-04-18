@@ -17,11 +17,11 @@ const mapGoogleBookToBook = (item: any): Book => {
   // Build the book object
   return {
     id: item.id,
-    title: volumeInfo.title,
+    title: volumeInfo.title || 'Unknown Title',
     author: volumeInfo.authors ? volumeInfo.authors.join(', ') : 'Unknown Author',
-    cover: volumeInfo.imageLinks?.thumbnail || '/placeholder.svg',
+    cover: volumeInfo.imageLinks?.thumbnail || '',
     description: volumeInfo.description || 'No description available',
-    genre: genres,
+    genre: genres.length > 0 ? genres : [{ id: 'genre-uncategorized', name: 'Uncategorized' }],
     rating: volumeInfo.averageRating || 0,
     year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : 0,
     reviews: [],
