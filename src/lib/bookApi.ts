@@ -1,36 +1,45 @@
 import { Book, Genre } from '@/types';
+import * as XLSX from 'xlsx';
 
-// Function to load and parse the local dataset
-// This should be replaced with your actual dataset loading logic
+// Function to load and parse the Excel dataset
 const loadLocalDataset = async (): Promise<Book[]> => {
   try {
-    // TODO: Replace this with your actual dataset loading logic
-    // Example: const response = await fetch('/path/to/your/dataset.json');
-    // const data = await response.json();
-    return []; // Currently returns empty array until dataset is provided
+    // This function would be called when your Excel file is uploaded to the project
+    // You'll need to place your Excel file in the public directory
+    const response = await fetch('/kindle_books.xlsx');
+    const arrayBuffer = await response.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer);
+    
+    // Assuming the first sheet contains the data
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(worksheet);
+    
+    return data.map(mapDatasetBookToBook);
   } catch (error) {
-    console.error('Error loading local dataset:', error);
+    console.error('Error loading Excel dataset:', error);
     return [];
   }
 };
 
-// Helper function to map your dataset format to our Book type
-const mapDatasetBookToBook = (datasetBook: any): Book => {
-  // TODO: Adjust this mapping according to your dataset structure
+// Helper function to map your Excel data format to our Book type
+const mapDatasetBookToBook = (row: any): Book => {
   return {
-    id: datasetBook.id || String(Math.random()),
-    title: datasetBook.title || 'Unknown Title',
-    author: datasetBook.author || 'Unknown Author',
-    cover: datasetBook.cover || '',
-    description: datasetBook.description || 'No description available',
-    genre: datasetBook.categories?.map((category: string, index: number) => ({
-      id: `genre-${index}-${category.toLowerCase().replace(/\s+/g, '-')}`,
-      name: category
-    })) || [{ id: 'genre-uncategorized', name: 'Uncategorized' }],
-    rating: datasetBook.rating || 0,
-    year: datasetBook.year || 0,
+    id: String(row.ASIN || Math.random()),
+    title: row.Title || 'Unknown Title',
+    author: row.Author || 'Unknown Author',
+    cover: row.ImageURL || '',
+    description: row.Description || 'No description available',
+    genre: (row.Categories || '')
+      .split(',')
+      .map((category: string, index: number) => ({
+        id: `genre-${index}-${category.trim().toLowerCase().replace(/\s+/g, '-')}`,
+        name: category.trim()
+      }))
+      .filter((genre: Genre) => genre.name),
+    rating: Number(row.Rating) || 0,
+    year: Number(row.PublicationYear) || 0,
     reviews: [],
-    amazonLink: generateAmazonLink(datasetBook.title, datasetBook.author)
+    amazonLink: row.URL || generateAmazonLink(row.Title, row.Author)
   };
 };
 
