@@ -4,8 +4,6 @@ import * as XLSX from 'xlsx';
 // Function to load and parse the Excel dataset
 const loadLocalDataset = async (): Promise<Book[]> => {
   try {
-    // This function would be called when your Excel file is uploaded to the project
-    // You'll need to place your Excel file in the public directory
     const response = await fetch('/kindle_books.xlsx');
     const arrayBuffer = await response.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer);
@@ -23,23 +21,26 @@ const loadLocalDataset = async (): Promise<Book[]> => {
 
 // Helper function to map your Excel data format to our Book type
 const mapDatasetBookToBook = (row: any): Book => {
+  // Create a more descriptive genre object using category data
+  const genre: Genre = {
+    id: `genre-${row.category_id || ''}`,
+    name: row.category_name || 'Uncategorized'
+  };
+
+  // Get year from publishedDate
+  const year = row.publishedDate ? new Date(row.publishedDate).getFullYear() : 0;
+  
   return {
-    id: String(row.ASIN || Math.random()),
-    title: row.Title || 'Unknown Title',
-    author: row.Author || 'Unknown Author',
-    cover: row.ImageURL || '',
-    description: row.Description || 'No description available',
-    genre: (row.Categories || '')
-      .split(',')
-      .map((category: string, index: number) => ({
-        id: `genre-${index}-${category.trim().toLowerCase().replace(/\s+/g, '-')}`,
-        name: category.trim()
-      }))
-      .filter((genre: Genre) => genre.name),
-    rating: Number(row.Rating) || 0,
-    year: Number(row.PublicationYear) || 0,
+    id: String(row.asin || Math.random()),
+    title: row.title || 'Unknown Title',
+    author: row.author || 'Unknown Author',
+    cover: row.imgUrl || '',
+    description: `${row.isKindleUnlimited ? '📱 Kindle Unlimited\n' : ''}${row.isBestSeller ? '🏆 Bestseller\n' : ''}${row.isEditorsPick ? '👑 Editor\'s Pick\n' : ''}${row.isGoodReadsChoice ? '📚 Goodreads Choice\n' : ''}Sold by: ${row.soldBy || 'Unknown Seller'}`,
+    genre: [genre],
+    rating: Number(row.stars) || 0,
+    year: year,
     reviews: [],
-    amazonLink: row.URL || generateAmazonLink(row.Title, row.Author)
+    amazonLink: row.productURL || generateAmazonLink(row.title, row.author)
   };
 };
 
