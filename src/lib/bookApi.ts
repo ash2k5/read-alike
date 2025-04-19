@@ -1,5 +1,39 @@
 import { Book, Genre } from '@/types';
 
+// Function to load and parse the local dataset
+// This should be replaced with your actual dataset loading logic
+const loadLocalDataset = async (): Promise<Book[]> => {
+  try {
+    // TODO: Replace this with your actual dataset loading logic
+    // Example: const response = await fetch('/path/to/your/dataset.json');
+    // const data = await response.json();
+    return []; // Currently returns empty array until dataset is provided
+  } catch (error) {
+    console.error('Error loading local dataset:', error);
+    return [];
+  }
+};
+
+// Helper function to map your dataset format to our Book type
+const mapDatasetBookToBook = (datasetBook: any): Book => {
+  // TODO: Adjust this mapping according to your dataset structure
+  return {
+    id: datasetBook.id || String(Math.random()),
+    title: datasetBook.title || 'Unknown Title',
+    author: datasetBook.author || 'Unknown Author',
+    cover: datasetBook.cover || '',
+    description: datasetBook.description || 'No description available',
+    genre: datasetBook.categories?.map((category: string, index: number) => ({
+      id: `genre-${index}-${category.toLowerCase().replace(/\s+/g, '-')}`,
+      name: category
+    })) || [{ id: 'genre-uncategorized', name: 'Uncategorized' }],
+    rating: datasetBook.rating || 0,
+    year: datasetBook.year || 0,
+    reviews: [],
+    amazonLink: generateAmazonLink(datasetBook.title, datasetBook.author)
+  };
+};
+
 // Google Books API base URL
 const GOOGLE_BOOKS_API_URL = 'https://www.googleapis.com/books/v1/volumes';
 
@@ -40,17 +74,43 @@ export const generateKindleLink = (title: string, author?: string): string => {
   return `https://www.amazon.com/s?k=${searchQuery}&i=digital-text`;
 };
 
-// Search books by query with pagination support, focusing on Kindle editions
+let localBooks: Book[] = [];
+
+// Initialize the local dataset
+const initializeLocalDataset = async () => {
+  localBooks = await loadLocalDataset();
+};
+
+// Call initialization when the module loads
+initializeLocalDataset();
+
+// Search books with local dataset first, then fallback to Google Books API
 export const searchBooks = async (query: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
+  const searchTerms = query.toLowerCase().split(' ');
+  
+  // Search in local dataset first
+  const localResults = localBooks
+    .filter(book => 
+      searchTerms.some(term => 
+        book.title.toLowerCase().includes(term) ||
+        book.author.toLowerCase().includes(term) ||
+        book.description.toLowerCase().includes(term)
+      )
+    )
+    .slice(startIndex, startIndex + maxResults);
+
+  if (localResults.length > 0) {
+    return localResults;
+  }
+
+  // Fallback to Google Books API if local search yields no results
   try {
-    // Add informat:epub to target digital/ebook formats
     const kindleQuery = `${encodeURIComponent(query)} informat:epub`;
     const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
     const data = await response.json();
     
     if (!data.items) return [];
     
-    // Filter out books without buyLinks or that aren't available as ebooks
     return data.items
       .filter((item: any) => {
         const volumeInfo = item.volumeInfo;
@@ -68,32 +128,27 @@ export const searchBooks = async (query: string, startIndex: number = 0, maxResu
   }
 };
 
-// Get book details by ID
-export const getBookById = async (bookId: string): Promise<Book | null> => {
-  try {
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}/${bookId}`);
-    const data = await response.json();
-    
-    if (!data || response.status !== 200) return null;
-    
-    return mapGoogleBookToBook(data);
-  } catch (error) {
-    console.error('Error fetching book details:', error);
-    return null;
-  }
-};
-
-// Get books by genre/category with pagination support, focusing on Kindle editions
+// Get books by genre using local dataset first
 export const getBooksByGenre = async (genre: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
+  // Search in local dataset first
+  const localResults = localBooks
+    .filter(book => 
+      book.genre.some(g => g.name.toLowerCase() === genre.toLowerCase())
+    )
+    .slice(startIndex, startIndex + maxResults);
+
+  if (localResults.length > 0) {
+    return localResults;
+  }
+
+  // Fallback to Google Books API
   try {
-    // Add informat:epub to target digital/ebook formats
     const kindleQuery = `subject:${encodeURIComponent(genre)} informat:epub`;
     const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
     const data = await response.json();
     
     if (!data.items) return [];
     
-    // Filter out books without buyLinks or that aren't available as ebooks
     return data.items
       .filter((item: any) => {
         const volumeInfo = item.volumeInfo;
@@ -108,6 +163,21 @@ export const getBooksByGenre = async (genre: string, startIndex: number = 0, max
   } catch (error) {
     console.error('Error fetching books by genre:', error);
     return [];
+  }
+};
+
+// Get book details by ID
+export const getBookById = async (bookId: string): Promise<Book | null> => {
+  try {
+    const response = await fetch(`${GOOGLE_BOOKS_API_URL}/${bookId}`);
+    const data = await response.json();
+    
+    if (!data || response.status !== 200) return null;
+    
+    return mapGoogleBookToBook(data);
+  } catch (error) {
+    console.error('Error fetching book details:', error);
+    return null;
   }
 };
 
