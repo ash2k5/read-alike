@@ -47,7 +47,7 @@ export function BookActions({ bookId, compact = false }: BookActionsProps) {
     setIsLoading(false);
   };
   
-  // If we already have this book in a list
+  
   if (currentStatus) {
     const statusLabels = {
       'reading': 'Currently Reading',
@@ -114,7 +114,7 @@ export function BookActions({ bookId, compact = false }: BookActionsProps) {
     );
   }
   
-  // If we don't have this book in a list yet
+ 
   return (
     <div className={`${compact ? 'flex justify-center' : ''}`}>
       <DropdownMenu>

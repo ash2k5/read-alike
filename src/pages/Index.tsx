@@ -16,12 +16,10 @@ const Index = () => {
   const [isLoadingTrending, setIsLoadingTrending] = useState(false);
   const { recommendations, loading: isLoadingRecommendations } = useRecommendations();
   
-  // Fetch trending books once on component mount
   useEffect(() => {
     async function fetchTrendingBooks() {
       setIsLoadingTrending(true);
       try {
-        // Try to get trending books from Google Books API
         const apiBooks = await searchBooks("subject:fiction&orderBy=newest");
         
         if (apiBooks && apiBooks.length > 0) {
@@ -29,7 +27,6 @@ const Index = () => {
         }
       } catch (error) {
         console.error("Error fetching trending books:", error);
-        // Fallback to mock data (already set as initial state)
       } finally {
         setIsLoadingTrending(false);
       }
@@ -38,7 +35,6 @@ const Index = () => {
     fetchTrendingBooks();
   }, []);
   
-  // Filter top reads if genre is selected
   const filteredTopReads = selectedGenreId 
     ? trendingBooks.filter(book => 
         book.genre.some(g => g.id === selectedGenreId)

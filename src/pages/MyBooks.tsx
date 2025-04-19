@@ -20,7 +20,6 @@ const MyBooks = () => {
   const { bookLists, loading: bookListsLoading } = useBookList();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   
-  // If still loading, show loading indicator
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -29,16 +28,13 @@ const MyBooks = () => {
     );
   }
   
-  // If no user, redirect to home
   if (!user && !authLoading) {
     return <Navigate to="/" />;
   }
   
-  // Get user's books from book lists
   const userBookIds = bookLists.map(item => item.book_id);
   const userBooks = books.filter(book => userBookIds.includes(book.id));
   
-  // Filter books by status
   const readingBooks = books.filter(book => 
     bookLists.some(item => item.book_id === book.id && item.status === 'reading')
   );
@@ -245,7 +241,6 @@ const MyBooks = () => {
   );
 };
 
-// Empty state component
 function EmptyBookList({ listType = "reading list" }: { listType?: string }) {
   return (
     <div className="text-center py-12 bg-white rounded-xl shadow-sm">
@@ -264,7 +259,6 @@ function EmptyBookList({ listType = "reading list" }: { listType?: string }) {
   );
 }
 
-// Helper Button component
 function Button({ 
   children, 
   variant = "default",

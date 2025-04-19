@@ -29,7 +29,7 @@ export function useUserProfile() {
         if (error) {
           console.error('Error loading profile:', error);
           
-          // If the error is "no rows" then create a new profile
+          
           if (error.code === 'PGRST116') {
             const newProfile: Partial<UserProfile> = {
               id: user.id,
