@@ -32,7 +32,7 @@ export function useReviews(bookId?: string) {
 
         setReviews(data || []);
         
-        // If user is logged in, find their review
+        
         if (user && bookId) {
           const myReview = data?.find(r => r.user_id === user.id && r.book_id === bookId) || null;
           setUserReview(myReview);
@@ -51,13 +51,13 @@ export function useReviews(bookId?: string) {
     if (!user) return { error: new Error('Not authenticated') };
 
     try {
-      // Check if the user already has a review for this book
+      
       const existingReview = reviews.find(review => 
         review.user_id === user.id && review.book_id === bookId
       );
       
       if (existingReview) {
-        // Update the existing review
+        
         const { data, error } = await supabase
           .from('user_reviews')
           .update({ rating, review_text: reviewText })
@@ -78,7 +78,7 @@ export function useReviews(bookId?: string) {
         toast.success('Review updated successfully');
         return { data };
       } else {
-        // Create a new review
+        
         const { data, error } = await supabase
           .from('user_reviews')
           .insert({
@@ -116,7 +116,7 @@ export function useReviews(bookId?: string) {
         .from('user_reviews')
         .delete()
         .eq('id', reviewId)
-        .eq('user_id', user.id); // Ensure the user owns this review
+        .eq('user_id', user.id); 
 
       if (error) {
         toast.error('Failed to delete review');

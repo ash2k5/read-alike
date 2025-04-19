@@ -26,12 +26,12 @@ export function useUserPreferences() {
           .eq('user_id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        if (error && error.code !== 'PGRST116') { 
           console.error('Error loading preferences:', error);
           return;
         }
 
-        // If no preferences exist, create default preferences
+        
         if (!data) {
           const defaultPreferences: Omit<UserPreferences, 'id' | 'created_at'> = {
             user_id: user.id,

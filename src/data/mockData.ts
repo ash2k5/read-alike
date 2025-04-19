@@ -272,18 +272,18 @@ export const books: Book[] = [
 ];
 
 export const topReadsThisMonth = [
-  books[0], // The Midnight Library
-  books[1], // Project Hail Mary
-  books[3], // The Silent Patient
-  books[7], // Atomic Habits
-  books[11] // The Invisible Life of Addie LaRue
+  books[0], 
+  books[1], 
+  books[3], 
+  books[7], 
+  books[11] 
 ];
 
 export const recommendedForYou = [
-  books[2], // The House in the Cerulean Sea
-  books[8], // Six of Crows
-  books[4], // Red, White & Royal Blue
-  books[10] // Where the Crawdads Sing
+  books[2], 
+  books[8], 
+  books[4], 
+  books[10] 
 ];
 
 export const users: User[] = [
@@ -296,5 +296,5 @@ export const users: User[] = [
   }
 ];
 
-// Currently logged in user (mock)
+
 export const currentUser = users[0];

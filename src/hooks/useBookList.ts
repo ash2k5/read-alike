@@ -45,11 +45,9 @@ export function useBookList() {
     if (!user) return { error: new Error('Not authenticated') };
 
     try {
-      // Check if the book is already in a list
       const existingEntry = bookLists.find(item => item.book_id === bookId);
       
       if (existingEntry) {
-        // Update the existing entry
         const { data, error } = await supabase
           .from('book_lists')
           .update({ status })
@@ -69,7 +67,6 @@ export function useBookList() {
         toast.success(`Book moved to "${status.replace('_', ' ')}" list`);
         return { data };
       } else {
-        // Create a new entry
         const { data, error } = await supabase
           .from('book_lists')
           .insert({

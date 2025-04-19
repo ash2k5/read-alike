@@ -41,7 +41,7 @@ export function GenreSelector({
     }
   };
   
-  // Determine if we're in multi-select mode
+  
   const isMultiSelect = onChange !== undefined;
   
   return (

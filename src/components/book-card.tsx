@@ -22,7 +22,7 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   
   useEffect(() => {
-    // Check if this book is a favorite when component mounts
+    
     async function checkFavorite() {
       if (!user) return;
       
@@ -55,7 +55,7 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
     
     try {
       if (isFavorite) {
-        // Remove from favorites
+        
         const { error } = await supabase
           .from('user_favorites')
           .delete()
@@ -71,7 +71,7 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
         setIsFavorite(false);
         toast.success('Removed from favorites');
       } else {
-        // Add to favorites
+        
         const { error } = await supabase
           .from('user_favorites')
           .insert({

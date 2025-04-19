@@ -17,7 +17,6 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  // If user is already logged in, redirect to my-books
   if (user) {
     navigate("/my-books");
     return null;
