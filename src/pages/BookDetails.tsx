@@ -24,14 +24,12 @@ const BookDetails = () => {
       setLoading(true);
       
       try {
-        // Try to fetch from Google Books API first
         if (id) {
           const apiBook = await getBookById(id);
           
           if (apiBook) {
             setBook(apiBook);
             
-            // Get similar books
             const similar = await getSimilarBooks(apiBook);
             setSimilarBooks(similar);
             setLoading(false);
@@ -39,11 +37,9 @@ const BookDetails = () => {
           }
         }
         
-        // Fallback to mock data if API fetch fails
         const foundBook = books.find(b => b.id === id);
         setBook(foundBook || null);
         
-        // Get similar books from mock data
         if (foundBook) {
           const genreIds = foundBook.genre.map(g => g.id);
           const similar = books
@@ -58,7 +54,6 @@ const BookDetails = () => {
         console.error("Error fetching book details:", error);
         toast.error("Failed to load book details");
         
-        // Fallback to mock data
         const foundBook = books.find(b => b.id === id);
         setBook(foundBook || null);
       } finally {

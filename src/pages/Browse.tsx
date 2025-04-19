@@ -35,7 +35,6 @@ const Browse = () => {
         const genre = genres.find(g => g.id === selectedGenreId);
         setSelectedGenre(genre);
         
-        // Try to fetch from API first
         if (genre) {
           let apiBooks: Book[] = [];
           
@@ -58,7 +57,6 @@ const Browse = () => {
           }
         }
         
-        // Fallback to mock data if API fails
         const filtered = books.filter(book => 
           book.genre.some(g => g.id === selectedGenreId)
         );
@@ -68,7 +66,6 @@ const Browse = () => {
       } else {
         setSelectedGenre(undefined);
         
-        // Try to fetch popular books from API
         let apiBooks: Book[] = [];
         const searchQuery = "subject:fiction&orderBy=relevance";
         
@@ -90,14 +87,12 @@ const Browse = () => {
           return;
         }
         
-        // Fallback to mock data
         setFilteredBooks(books);
         setTotalBooks(books.length);
         setTotalPages(Math.ceil(books.length / booksPerPage));
       }
     } catch (error) {
       console.error("Error fetching books:", error);
-      // Fallback to mock data
       if (selectedGenreId) {
         const filtered = books.filter(book => 
           book.genre.some(g => g.id === selectedGenreId)
@@ -116,13 +111,11 @@ const Browse = () => {
     }
   };
   
-  // Initial fetch when genre changes
   useEffect(() => {
     setCurrentPage(1);
     fetchBooks(1);
   }, [selectedGenreId]);
   
-  // Load more books when page changes
   useEffect(() => {
     if (currentPage > 1) {
       setLoadingMore(true);

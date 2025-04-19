@@ -1,207 +1,375 @@
 import { Book, Genre } from '@/types';
-import * as XLSX from 'xlsx';
+import { scrapeAmazonBookData, scrapeAmazonBookDetails } from './amazonScraper';
+import { getBookDescription } from './webScraper';
+import { getAdditionalBookData } from './additionalDataSources';
+import { cacheManager } from './cacheManager';
+import { config } from './config';
 
-// Function to load and parse the Excel dataset
-const loadLocalDataset = async (): Promise<Book[]> => {
+const GOOGLE_BOOKS_API_URL = config.googleBooksApiUrl;
+const GOOGLE_BOOKS_API_KEY = config.googleBooksApiKey;
+const OPEN_LIBRARY_COVERS_URL = config.openLibraryCoversUrl;
+
+const cleanHtmlTags = (text: string): string => {
+  if (!text) return '';
+  return text.replace(/<[^>]*>/g, '');
+};
+
+const validateImageUrl = async (url: string): Promise<boolean> => {
+  if (!url) return false;
   try {
-    // Using mock data if Excel file is not available or has issues
-    // This helps prevent the app from breaking when the Excel file isn't found
-    const mockBooks = [];
-    for (let i = 0; i < 20; i++) {
-      mockBooks.push({
-        id: `mock-${i}`,
-        title: `Kindle Book ${i + 1}`,
-        author: `Author ${i + 1}`,
-        cover: '',
-        description: 'This is a placeholder for a Kindle book when the dataset is not available.',
-        genre: [{ id: `genre-fiction-${i}`, name: 'Fiction' }],
-        rating: Math.floor(Math.random() * 5) + 1,
-        year: 2023,
-        reviews: [],
-        amazonLink: '#'
-      });
-    }
+    const response = await fetch(url);
+    if (!response.ok) return false;
     
-    try {
-      // Try to fetch the Excel file
-      const response = await fetch('/kindle_books.xlsx');
-      const arrayBuffer = await response.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer);
-      
-      // Assuming the first sheet contains the data
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = XLSX.utils.sheet_to_json(worksheet);
-      
-      return data.map(mapDatasetBookToBook);
-    } catch (excelError) {
-      console.error('Error loading Excel dataset, using mock data:', excelError);
-      return mockBooks;
-    }
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.startsWith('image/')) return false;
+    
+    const buffer = await response.arrayBuffer();
+    return buffer.byteLength > 1000; // Ensure the image has some content
   } catch (error) {
-    console.error('Error in loadLocalDataset:', error);
-    return [];
+    console.error('Error validating image URL:', url, error);
+    return false;
   }
 };
 
-// Helper function to map your Excel data format to our Book type
-const mapDatasetBookToBook = (row: any): Book => {
-  // Create a more descriptive genre object using category data
-  const genre: Genre = {
-    id: `genre-${row.category_id || ''}`,
-    name: row.category_name || 'Uncategorized'
-  };
+const getBestCoverImage = async (volumeInfo: any, isbn?: string, title?: string, author?: string): Promise<string> => {
+  const cacheKey = `cover-${isbn || title}-${author}`;
+  return cacheManager.get(cacheKey, async () => {
+    console.log('Fetching cover for:', { title, author, isbn });
 
-  // Get year from publishedDate
-  const year = row.publishedDate ? new Date(row.publishedDate).getFullYear() : 0;
-  
-  return {
-    id: String(row.asin || Math.random()),
-    title: row.title || 'Unknown Title',
-    author: row.author || 'Unknown Author',
-    cover: row.imgUrl || '',
-    description: `${row.isKindleUnlimited ? '📱 Kindle Unlimited\n' : ''}${row.isBestSeller ? '🏆 Bestseller\n' : ''}${row.isEditorsPick ? '👑 Editor\'s Pick\n' : ''}${row.isGoodReadsChoice ? '📚 Goodreads Choice\n' : ''}Sold by: ${row.soldBy || 'Unknown Seller'}`,
-    genre: [genre],
-    rating: Number(row.stars) || 0,
-    year: year,
-    reviews: [],
-    amazonLink: row.productURL || generateAmazonLink(row.title, row.author)
-  };
+    if (volumeInfo.imageLinks) {
+      console.log('Google Books image links available:', volumeInfo.imageLinks);
+      
+      const imageSizes = ['extraLarge', 'large', 'medium', 'small', 'thumbnail'];
+      for (const size of imageSizes) {
+        const imageUrl = volumeInfo.imageLinks[size];
+        if (imageUrl) {
+          console.log(`Trying Google Books ${size} image:`, imageUrl);
+          const cleanUrl = imageUrl.replace('&edge=curl', '');
+          if (await validateImageUrl(cleanUrl)) {
+            return cleanUrl;
+          }
+        }
+      }
+    }
+
+    if (isbn) {
+      const sizes = ['L', 'M', 'S'];
+      for (const size of sizes) {
+        const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-${size}.jpg`;
+        console.log('Trying Open Library ISBN image:', openLibraryUrl);
+        if (await validateImageUrl(openLibraryUrl)) {
+          return openLibraryUrl;
+        }
+      }
+    }
+
+    if (title) {
+      const searchUrl = `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-L.jpg`;
+      console.log('Trying Open Library search image:', searchUrl);
+      if (await validateImageUrl(searchUrl)) {
+        return searchUrl;
+      }
+    }
+
+    if (title && author) {
+      const searchQuery = encodeURIComponent(`${title} ${author}`);
+      const googleSearchUrl = `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=1`;
+      try {
+        const response = await fetch(googleSearchUrl);
+        const data = await response.json();
+        if (data.items?.[0]?.volumeInfo?.imageLinks) {
+          const imageUrl = data.items[0].volumeInfo.imageLinks.thumbnail;
+          if (imageUrl && await validateImageUrl(imageUrl)) {
+            return imageUrl;
+          }
+        }
+      } catch (error) {
+        console.error('Error searching Google Books:', error);
+      }
+    }
+
+    if (title) {
+      try {
+        console.log('Trying Amazon scraping for:', title);
+        const amazonData = await scrapeAmazonBookData(title, author);
+        if (amazonData.cover && await validateImageUrl(amazonData.cover)) {
+          console.log('Found valid Amazon cover:', amazonData.cover);
+          return amazonData.cover;
+        }
+      } catch (error) {
+        console.error('Error getting Amazon cover:', error);
+      }
+    }
+
+    console.log('No valid cover found, using placeholder');
+    return '/placeholder-book.svg';
+  });
 };
 
-// Google Books API base URL
-const GOOGLE_BOOKS_API_URL = 'https://www.googleapis.com/books/v1/volumes';
+const getISBN = (volumeInfo: any): string | undefined => {
+  const identifiers = volumeInfo.industryIdentifiers || [];
+  const isbn13 = identifiers.find((id: any) => id.type === 'ISBN_13');
+  const isbn10 = identifiers.find((id: any) => id.type === 'ISBN_10');
+  return (isbn13 || isbn10)?.identifier;
+};
 
-// Helper function to map Google Books API response to our Book type
-const mapGoogleBookToBook = (item: any): Book => {
+const getBookRating = async (title: string, author?: string): Promise<number> => {
+  const cacheKey = `rating-${title}-${author}`;
+  return cacheManager.get(cacheKey, async () => {
+    const amazonData = await scrapeAmazonBookData(title, author);
+    return amazonData.rating || 0;
+  });
+};
+
+const formatDescription = (sources: string[]): string => {
+  const validDescriptions = sources.filter(desc => desc && desc.trim() !== '');
+  
+  if (validDescriptions.length === 0) {
+    return 'No description available';
+  }
+
+  return validDescriptions
+    .map(desc => cleanHtmlTags(desc.trim()))
+    .map(desc => {
+      if (!desc.match(/[.!?]$/)) {
+        desc += '.';
+      }
+      return desc;
+    })
+    .join('\n\n'); 
+};
+
+const getAmazonData = async (title: string, author?: string, volumeInfo?: any): Promise<Partial<Book>> => {
+  const cacheKey = `amazon-${title}-${author}`;
+  return cacheManager.get(cacheKey, async () => {
+    const amazonData = await scrapeAmazonBookData(title, author);
+    const amazonDetails = amazonData.amazonLink ? await scrapeAmazonBookDetails(amazonData.amazonLink) : {};
+    
+    const description = formatDescription([
+      amazonDetails.description,
+      volumeInfo?.description
+    ]);
+  
+  return {
+      description,
+      genre: amazonDetails.genre || [],
+      amazonLink: amazonData.amazonLink || generateAmazonLink(title, author),
+      rating: amazonData.rating || 0
+    };
+  });
+};
+
+const getBookGenres = async (volumeInfo: any, title: string, author?: string): Promise<Genre[]> => {
+  const cacheKey = `genres-${title}-${author}`;
+  return cacheManager.get(cacheKey, async () => {
+    const genres: Genre[] = [];
+
+    if (volumeInfo.categories) {
+      genres.push(...volumeInfo.categories.map((category: string, index: number) => ({
+        id: `genre-google-${index}-${category.toLowerCase().replace(/\s+/g, '-')}`,
+        name: category
+      })));
+    }
+
+    try {
+      const amazonData = await scrapeAmazonBookData(title, author);
+      const amazonDetails = amazonData.amazonLink ? await scrapeAmazonBookDetails(amazonData.amazonLink) : {};
+      
+      if (amazonDetails.genre) {
+        genres.push(...amazonDetails.genre);
+      }
+    } catch (error) {
+      console.error('Error getting Amazon genres:', error);
+    }
+
+    if (volumeInfo.description) {
+      const commonGenres = [
+        'Fiction', 'Non-Fiction', 'Mystery', 'Romance', 'Science Fiction', 'Fantasy',
+        'Thriller', 'Horror', 'Biography', 'History', 'Self-Help', 'Business',
+        'Young Adult', 'Children', 'Poetry', 'Drama', 'Comedy', 'Adventure'
+      ];
+
+      const description = volumeInfo.description.toLowerCase();
+      const foundGenres = commonGenres.filter(genre => 
+        description.includes(genre.toLowerCase())
+      );
+
+      genres.push(...foundGenres.map((genre, index) => ({
+        id: `genre-desc-${index}-${genre.toLowerCase().replace(/\s+/g, '-')}`,
+        name: genre
+      })));
+    }
+
+    const uniqueGenres = genres.filter((genre, index, self) => 
+      index === self.findIndex(g => g.name.toLowerCase() === genre.name.toLowerCase())
+    );
+
+    if (uniqueGenres.length === 0) {
+      const defaultGenre = determineDefaultGenre(volumeInfo);
+      uniqueGenres.push({
+        id: 'genre-default-uncategorized',
+        name: defaultGenre
+      });
+    }
+
+    return uniqueGenres;
+  });
+};
+
+const determineDefaultGenre = (volumeInfo: any): string => {
+  if (volumeInfo.maturityRating === 'NOT_MATURE') {
+    return 'Children';
+  }
+
+  if (volumeInfo.categories?.some((cat: string) => 
+    cat.toLowerCase().includes('textbook') || 
+    cat.toLowerCase().includes('education')
+  )) {
+    return 'Educational';
+  }
+
+  if (volumeInfo.description) {
+    const desc = volumeInfo.description.toLowerCase();
+    if (desc.includes('novel') || desc.includes('story') || desc.includes('tale')) {
+      return 'Fiction';
+    }
+    if (desc.includes('history') || desc.includes('biography') || desc.includes('memoir')) {
+      return 'Non-Fiction';
+    }
+  }
+
+  return 'General';
+};
+
+const mapGoogleBookToBook = async (item: any): Promise<Book> => {
   const volumeInfo = item.volumeInfo;
-  
-  // Extract genres from categories
-  const genres: Genre[] = (volumeInfo.categories || []).map((category: string, index: number) => ({
-    id: `genre-${index}-${category.toLowerCase().replace(/\s+/g, '-')}`,
-    name: category
-  }));
-  
-  // Build the book object
+  const isbn = getISBN(volumeInfo);
+  const title = volumeInfo.title;
+  const author = volumeInfo.authors?.[0];
+
+  let cover = '';
+  try {
+    cover = await getBestCoverImage(volumeInfo, isbn, title, author);
+  } catch (error) {
+    console.error('Error getting cover image:', error);
+  }
+
+  let amazonData: Partial<Book> = {};
+  try {
+    amazonData = await getAmazonData(title, author, volumeInfo);
+  } catch (error) {
+    console.error('Error getting Amazon data:', error);
+  }
+
+  let genres: Genre[] = [];
+  try {
+    genres = await getBookGenres(volumeInfo, title, author);
+  } catch (error) {
+    console.error('Error getting genres:', error);
+    genres = [{ id: 'genre-default-uncategorized', name: 'General' }];
+  }
+
   return {
     id: item.id,
-    title: volumeInfo.title || 'Unknown Title',
+    title: title || 'Unknown Title',
     author: volumeInfo.authors ? volumeInfo.authors.join(', ') : 'Unknown Author',
-    cover: volumeInfo.imageLinks?.thumbnail || '',
-    description: volumeInfo.description || 'No description available',
-    genre: genres.length > 0 ? genres : [{ id: 'genre-uncategorized', name: 'Uncategorized' }],
-    rating: volumeInfo.averageRating || 0,
+    cover: cover || '/placeholder-book.svg',
+    description: amazonData.description || formatDescription([volumeInfo.description]),
+    genre: genres,
+    rating: amazonData.rating || 0,
     year: volumeInfo.publishedDate ? new Date(volumeInfo.publishedDate).getFullYear() : 0,
     reviews: [],
-    amazonLink: generateAmazonLink(volumeInfo.title, volumeInfo.authors?.[0])
+    amazonLink: amazonData.amazonLink || generateAmazonLink(title, author)
   };
 };
 
-// Generate Amazon search link based on book title and author
 export const generateAmazonLink = (title: string, author?: string): string => {
   const searchQuery = encodeURIComponent(`${title} ${author || ''}`);
   return `https://www.amazon.com/s?k=${searchQuery}&i=stripbooks`;
 };
 
-// Generate Kindle store link
 export const generateKindleLink = (title: string, author?: string): string => {
   const searchQuery = encodeURIComponent(`${title} ${author || ''}`);
   return `https://www.amazon.com/s?k=${searchQuery}&i=digital-text`;
 };
 
-let localBooks: Book[] = [];
-
-// Initialize the local dataset
-const initializeLocalDataset = async () => {
-  localBooks = await loadLocalDataset();
-  console.log(`Loaded ${localBooks.length} books from local dataset`);
+const makeApiRequest = async (url: string): Promise<any> => {
+  try {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        throw new Error('API key is invalid or quota exceeded');
+      }
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('API request error:', error);
+    throw error;
+  }
 };
 
-// Call initialization when the module loads
-initializeLocalDataset();
-
-// Search books with local dataset first, then fallback to Google Books API
 export const searchBooks = async (query: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
-  const searchTerms = query.toLowerCase().split(' ');
-  
-  // Search in local dataset first
-  const localResults = localBooks
-    .filter(book => 
-      searchTerms.some(term => 
-        book.title.toLowerCase().includes(term) ||
-        book.author.toLowerCase().includes(term) ||
-        book.description.toLowerCase().includes(term)
-      )
-    )
-    .slice(startIndex, startIndex + maxResults);
-
-  if (localResults.length > 0) {
-    return localResults;
-  }
-
-  // Fallback to Google Books API if local search yields no results
   try {
-    const kindleQuery = `${encodeURIComponent(query)} informat:epub`;
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
-    const data = await response.json();
+    console.log('Searching books with query:', query);
     
-    if (!data.items) return [];
-    
-    return data.items
-      .filter((item: any) => {
-        const volumeInfo = item.volumeInfo;
-        const saleInfo = item.saleInfo;
-        return volumeInfo && (
-          saleInfo?.isEbook === true || 
-          volumeInfo.readingModes?.epub === true ||
-          volumeInfo.readingModes?.pdf === true
-        );
-      })
-      .map(mapGoogleBookToBook);
+    const cacheKey = `search-${query}-${startIndex}-${maxResults}`;
+    return cacheManager.get(cacheKey, async () => {
+      const searchUrl = `${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance&key=${GOOGLE_BOOKS_API_KEY}`;
+      console.log('Fetching from URL:', searchUrl);
+      
+      const data = await makeApiRequest(searchUrl);
+      console.log('Received data items:', data.items?.length || 0);
+      
+      if (!data.items || data.items.length === 0) {
+        console.log('No books found for query:', query);
+        return [];
+      }
+      
+      const batchSize = 5;
+      const books: Book[] = [];
+      
+      for (let i = 0; i < data.items.length; i += batchSize) {
+        const batch = data.items.slice(i, i + batchSize);
+        console.log(`Processing batch ${i / batchSize + 1} of ${Math.ceil(data.items.length / batchSize)}`);
+        
+        try {
+          const batchResults = await Promise.all(batch.map(mapGoogleBookToBook));
+          books.push(...batchResults);
+        } catch (error) {
+          console.error('Error processing batch:', error);
+          continue;
+        }
+      }
+      
+      console.log('Successfully processed books:', books.length);
+      return books;
+    });
   } catch (error) {
-    console.error('Error searching books:', error);
+    console.error('Error in searchBooks:', error);
     return [];
   }
 };
 
-// Get books by genre using local dataset first
 export const getBooksByGenre = async (genre: string, startIndex: number = 0, maxResults: number = 40): Promise<Book[]> => {
-  // Search in local dataset first
-  const localResults = localBooks
-    .filter(book => 
-      book.genre.some(g => g.name.toLowerCase() === genre.toLowerCase())
-    )
-    .slice(startIndex, startIndex + maxResults);
-
-  if (localResults.length > 0) {
-    return localResults;
-  }
-
-  // Fallback to Google Books API
   try {
-    const kindleQuery = `subject:${encodeURIComponent(genre)} informat:epub`;
-    const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${kindleQuery}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`);
+    const response = await fetch(
+      `${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(genre)}&startIndex=${startIndex}&maxResults=${maxResults}&orderBy=relevance`
+    );
     const data = await response.json();
     
     if (!data.items) return [];
     
-    return data.items
-      .filter((item: any) => {
-        const volumeInfo = item.volumeInfo;
-        const saleInfo = item.saleInfo;
-        return volumeInfo && (
-          saleInfo?.isEbook === true || 
-          volumeInfo.readingModes?.epub === true ||
-          volumeInfo.readingModes?.pdf === true
-        );
-      })
-      .map(mapGoogleBookToBook);
+    const books = await Promise.all(data.items.map(mapGoogleBookToBook));
+    return books;
   } catch (error) {
     console.error('Error fetching books by genre:', error);
     return [];
   }
 };
 
-// Get book details by ID
 export const getBookById = async (bookId: string): Promise<Book | null> => {
   try {
     const response = await fetch(`${GOOGLE_BOOKS_API_URL}/${bookId}`);
@@ -209,66 +377,55 @@ export const getBookById = async (bookId: string): Promise<Book | null> => {
     
     if (!data || response.status !== 200) return null;
     
-    return mapGoogleBookToBook(data);
+    return await mapGoogleBookToBook(data);
   } catch (error) {
     console.error('Error fetching book details:', error);
     return null;
   }
 };
 
-// Get similar books based on a book's ID
-export const getSimilarBooks = async (book: Book): Promise<Book[]> => {
-  // Use the first genre of the book to find similar books
-  if (book.genre.length === 0) return [];
-  
-  const genre = book.genre[0].name;
-  const author = book.author.split(',')[0]; // Get the first author
-  
+export const getSimilarBooks = async (book: Book, limit: number = 5): Promise<Book[]> => {
   try {
-    // Search for books with same genre but exclude the original book
-    const genreResponse = await fetch(
-      `${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(genre)}&maxResults=20`
-    );
-    const genreData = await genreResponse.json();
+    console.log('Finding similar books for:', book.title);
     
-    // Search for books by the same author
-    const authorResponse = await fetch(
-      `${GOOGLE_BOOKS_API_URL}?q=inauthor:${encodeURIComponent(author)}&maxResults=10`
-    );
-    const authorData = await authorResponse.json();
-    
-    let similarBooks: Book[] = [];
-    
-    // Add books from same genre
-    if (genreData.items) {
-      similarBooks = [...similarBooks, ...genreData.items.map(mapGoogleBookToBook)];
+    const primaryGenre = book.genre[0]?.name;
+    if (!primaryGenre) {
+      console.log('No genre found for book');
+      return [];
     }
     
-    // Add books from same author
-    if (authorData.items) {
-      similarBooks = [...similarBooks, ...authorData.items.map(mapGoogleBookToBook)];
-    }
-    
-    // Remove duplicates and the original book
-    const uniqueBooks = similarBooks.filter(
-      (similarBook, index, self) => 
-        similarBook.id !== book.id && 
-        index === self.findIndex(b => b.id === similarBook.id)
-    );
-    
-    return uniqueBooks.slice(0, 5); // Return max 5 similar books
+    const cacheKey = `similar-${book.id}-${primaryGenre}-${limit}`;
+    return cacheManager.get(cacheKey, async () => {
+      const searchUrl = `${GOOGLE_BOOKS_API_URL}?q=subject:${encodeURIComponent(primaryGenre)}&maxResults=${limit + 1}&key=${GOOGLE_BOOKS_API_KEY}`;
+      console.log('Searching similar books with URL:', searchUrl);
+      
+      const data = await makeApiRequest(searchUrl);
+      
+      if (!data.items || data.items.length === 0) {
+        console.log('No similar books found');
+        return [];
+      }
+      
+      const similarBooks = await Promise.all(
+        data.items
+          .filter((item: any) => item.id !== book.id)
+          .slice(0, limit)
+          .map(mapGoogleBookToBook)
+      );
+      
+      console.log('Found similar books:', similarBooks.length);
+      return similarBooks;
+    });
   } catch (error) {
-    console.error('Error fetching similar books:', error);
+    console.error('Error finding similar books:', error);
     return [];
   }
 };
 
-// Get more books for pagination (load next page)
 export const getMoreBooks = async (query: string, startIndex: number, maxResults: number = 40): Promise<Book[]> => {
   return searchBooks(query, startIndex, maxResults);
 };
 
-// Get more books by genre for pagination
 export const getMoreBooksByGenre = async (genre: string, startIndex: number, maxResults: number = 40): Promise<Book[]> => {
   return getBooksByGenre(genre, startIndex, maxResults);
 };

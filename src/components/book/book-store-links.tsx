@@ -8,10 +8,10 @@ interface BookStoreLinksProps {
 }
 
 export function BookStoreLinks({ book }: BookStoreLinksProps) {
-  // Generate Amazon link, using the existing link if available, otherwise create a new one
+  
   const amazonLink = book.amazonLink || generateAmazonLink(book.title, book.author);
   
-  // Generate Kindle link
+  
   const kindleLink = generateKindleLink(book.title, book.author);
   
   return (

@@ -19,28 +19,28 @@ export function useRecommendations() {
         setLoading(true);
         let recommendedBooks: Book[] = [];
         
-        // If user has favorite genres, get recommendations based on those
+        
         if (profile?.favorite_genres && profile.favorite_genres.length > 0) {
-          // Get a random favorite genre
+          
           const randomGenre = profile.favorite_genres[
             Math.floor(Math.random() * profile.favorite_genres.length)
           ];
           
-          // Get books from this genre
+          
           const genreBooks = await getBooksByGenre(randomGenre);
           if (genreBooks.length > 0) {
             recommendedBooks = [...recommendedBooks, ...genreBooks];
           }
         }
         
-        // Get books the user has read
+        
         const readBookIds = bookLists
           .filter(item => item.status === 'completed')
           .map(item => item.book_id);
         
-        // If user has read books, get similar books
+        
         if (readBookIds.length > 0) {
-          // Get a random read book
+          
           const randomBookId = readBookIds[Math.floor(Math.random() * readBookIds.length)];
           const randomBook = mockBooks.find(book => book.id === randomBookId);
           
@@ -52,25 +52,25 @@ export function useRecommendations() {
           }
         }
         
-        // If we couldn't get any recommendations, fall back to mock data
+        
         if (recommendedBooks.length === 0) {
           recommendedBooks = mockBooks.slice(0, 5);
         }
         
-        // Remove duplicates and filter out books the user already has in their lists
+        
         const userBookIds = bookLists.map(item => item.book_id);
         const uniqueRecommendations = recommendedBooks
           .filter((book, index, self) => 
             !userBookIds.includes(book.id) && 
             index === self.findIndex(b => b.id === book.id)
           )
-          .slice(0, 10); // Limit to 10 recommendations
+          .slice(0, 10); 
         
         setRecommendations(uniqueRecommendations);
       } catch (err) {
         console.error('Error fetching recommendations:', err);
         setError(err instanceof Error ? err : new Error('Failed to fetch recommendations'));
-        // Fallback to mock data
+        
         setRecommendations(mockBooks.slice(0, 5));
       } finally {
         setLoading(false);
