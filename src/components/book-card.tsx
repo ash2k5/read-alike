@@ -1,10 +1,14 @@
 
+import { Heart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Book as BookIcon } from "lucide-react";
 import { Book } from "@/types";
 import { Rating } from "@/components/ui/rating";
-import { Heart } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { BookActions } from "@/components/book/book-actions";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { toast } from "@/components/ui/sonner";
+import { supabase } from "@/lib/supabase";
 
 interface BookCardProps {
   book: Book;
@@ -12,8 +16,86 @@ interface BookCardProps {
 }
 
 export function BookCard({ book, variant = "default" }: BookCardProps) {
+  const { user } = useSupabaseAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    // Check if this book is a favorite when component mounts
+    async function checkFavorite() {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_favorites')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('book_id', book.id)
+          .single();
+          
+        if (!error && data) {
+          setIsFavorite(true);
+        }
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
+      }
+    }
+    
+    checkFavorite();
+  }, [user, book.id]);
+  
+  const toggleFavorite = async () => {
+    if (!user) {
+      toast.error('Please log in to add favorites');
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      if (isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('user_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('book_id', book.id);
+          
+        if (error) {
+          console.error('Error removing favorite:', error);
+          toast.error('Failed to remove from favorites');
+          return;
+        }
+        
+        setIsFavorite(false);
+        toast.success('Removed from favorites');
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('user_favorites')
+          .insert({
+            user_id: user.id,
+            book_id: book.id,
+            created_at: new Date().toISOString()
+          });
+          
+        if (error) {
+          console.error('Error adding favorite:', error);
+          toast.error('Failed to add to favorites');
+          return;
+        }
+        
+        setIsFavorite(true);
+        toast.success('Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const fallbackImage = () => {
     return (
@@ -50,14 +132,22 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
             <Rating value={book.rating} showValue size="md" />
           </div>
           <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">{book.description}</p>
+          
+          <div className="mt-4 flex items-center space-x-2">
+            {user && <BookActions bookId={book.id} compact={true} />}
+          </div>
         </div>
         <button
-          onClick={() => setIsFavorite(!isFavorite)}
+          onClick={toggleFavorite}
+          disabled={isLoading}
           className="p-2 rounded-full hover:bg-gray-100 smooth-transition"
         >
           <Heart
             size={22}
-            className={`smooth-transition ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"}`}
+            className={`smooth-transition ${
+              isLoading ? "text-gray-300" : 
+              isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"
+            }`}
           />
         </button>
       </div>
@@ -68,12 +158,16 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
     <div className="group fade-in relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:shadow-lg hover:border-book-purple/30">
       <div className="absolute top-3 right-3 z-10">
         <button
-          onClick={() => setIsFavorite(!isFavorite)}
+          onClick={toggleFavorite}
+          disabled={isLoading}
           className="p-1.5 rounded-full bg-white/90 backdrop-blur-sm hover:bg-white smooth-transition"
         >
           <Heart
             size={20}
-            className={`smooth-transition ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-500"}`}
+            className={`smooth-transition ${
+              isLoading ? "text-gray-300" : 
+              isFavorite ? "fill-red-500 text-red-500" : "text-gray-500"
+            }`}
           />
         </button>
       </div>
@@ -100,6 +194,12 @@ export function BookCard({ book, variant = "default" }: BookCardProps) {
           <Rating value={book.rating} size="sm" />
           <span className="text-xs text-gray-500 font-medium">{book.year}</span>
         </div>
+        
+        {user && (
+          <div className="mt-3">
+            <BookActions bookId={book.id} compact={true} />
+          </div>
+        )}
       </div>
     </div>
   );

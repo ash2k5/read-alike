@@ -4,17 +4,41 @@ import * as XLSX from 'xlsx';
 // Function to load and parse the Excel dataset
 const loadLocalDataset = async (): Promise<Book[]> => {
   try {
-    const response = await fetch('/kindle_books.xlsx');
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer);
+    // Using mock data if Excel file is not available or has issues
+    // This helps prevent the app from breaking when the Excel file isn't found
+    const mockBooks = [];
+    for (let i = 0; i < 20; i++) {
+      mockBooks.push({
+        id: `mock-${i}`,
+        title: `Kindle Book ${i + 1}`,
+        author: `Author ${i + 1}`,
+        cover: '',
+        description: 'This is a placeholder for a Kindle book when the dataset is not available.',
+        genre: [{ id: `genre-fiction-${i}`, name: 'Fiction' }],
+        rating: Math.floor(Math.random() * 5) + 1,
+        year: 2023,
+        reviews: [],
+        amazonLink: '#'
+      });
+    }
     
-    // Assuming the first sheet contains the data
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = XLSX.utils.sheet_to_json(worksheet);
-    
-    return data.map(mapDatasetBookToBook);
+    try {
+      // Try to fetch the Excel file
+      const response = await fetch('/kindle_books.xlsx');
+      const arrayBuffer = await response.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer);
+      
+      // Assuming the first sheet contains the data
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(worksheet);
+      
+      return data.map(mapDatasetBookToBook);
+    } catch (excelError) {
+      console.error('Error loading Excel dataset, using mock data:', excelError);
+      return mockBooks;
+    }
   } catch (error) {
-    console.error('Error loading Excel dataset:', error);
+    console.error('Error in loadLocalDataset:', error);
     return [];
   }
 };
@@ -89,6 +113,7 @@ let localBooks: Book[] = [];
 // Initialize the local dataset
 const initializeLocalDataset = async () => {
   localBooks = await loadLocalDataset();
+  console.log(`Loaded ${localBooks.length} books from local dataset`);
 };
 
 // Call initialization when the module loads

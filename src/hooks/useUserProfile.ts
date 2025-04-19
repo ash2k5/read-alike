@@ -28,6 +28,31 @@ export function useUserProfile() {
 
         if (error) {
           console.error('Error loading profile:', error);
+          
+          // If the error is "no rows" then create a new profile
+          if (error.code === 'PGRST116') {
+            const newProfile: Partial<UserProfile> = {
+              id: user.id,
+              email: user.email || '',
+              username: user.email?.split('@')[0] || 'User',
+              favorite_genres: [],
+              created_at: new Date().toISOString()
+            };
+            
+            const { data: createdProfile, error: createError } = await supabase
+              .from('user_profiles')
+              .insert(newProfile)
+              .select()
+              .single();
+              
+            if (createError) {
+              console.error('Error creating profile:', createError);
+              return;
+            }
+            
+            setProfile(createdProfile);
+            return;
+          }
           return;
         }
 
