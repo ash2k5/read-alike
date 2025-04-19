@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { BookGrid } from "@/components/book-grid";
@@ -5,6 +6,7 @@ import { GenreSelector } from "@/components/genre-selector";
 import { books, genres } from "@/data/mockData";
 import { Book } from "@/types";
 import { Search as SearchIcon } from "lucide-react";
+import { searchBooks, getBooksByGenre } from "@/lib/bookApi";
 
 const Search = () => {
   const [query, setQuery] = useState("");
