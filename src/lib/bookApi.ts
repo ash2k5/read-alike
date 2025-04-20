@@ -17,14 +17,13 @@ const cleanHtmlTags = (text: string): string => {
 const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url) return false;
   try {
-    const response = await fetch(url);
-    if (!response.ok) return false;
-    
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.startsWith('image/')) return false;
-    
-    const buffer = await response.arrayBuffer();
-    return buffer.byteLength > 1000; // Ensure the image has some content
+    const response = await fetch(url, {
+      mode: 'no-cors',
+      headers: {
+        'Accept': 'image/*'
+      }
+    });
+    return true; // If we can make the request, consider it valid
   } catch (error) {
     console.error('Error validating image URL:', url, error);
     return false;
@@ -36,73 +35,29 @@ const getBestCoverImage = async (volumeInfo: any, isbn?: string, title?: string,
   return cacheManager.get(cacheKey, async () => {
     console.log('Fetching cover for:', { title, author, isbn });
 
+    // Try Google Books images first
     if (volumeInfo.imageLinks) {
-      console.log('Google Books image links available:', volumeInfo.imageLinks);
-      
       const imageSizes = ['extraLarge', 'large', 'medium', 'small', 'thumbnail'];
       for (const size of imageSizes) {
         const imageUrl = volumeInfo.imageLinks[size];
         if (imageUrl) {
-          console.log(`Trying Google Books ${size} image:`, imageUrl);
           const cleanUrl = imageUrl.replace('&edge=curl', '');
-          if (await validateImageUrl(cleanUrl)) {
-            return cleanUrl;
-          }
+          // Use the image URL directly since we're using no-cors mode
+          return cleanUrl;
         }
       }
     }
 
+    // Try Open Library if we have an ISBN
     if (isbn) {
-      const sizes = ['L', 'M', 'S'];
-      for (const size of sizes) {
-        const openLibraryUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-${size}.jpg`;
-        console.log('Trying Open Library ISBN image:', openLibraryUrl);
-        if (await validateImageUrl(openLibraryUrl)) {
-          return openLibraryUrl;
-        }
+      const openLibraryUrl = `${OPEN_LIBRARY_COVERS_URL}/${isbn}-L.jpg`;
+      if (await validateImageUrl(openLibraryUrl)) {
+        return openLibraryUrl;
       }
     }
 
-    if (title) {
-      const searchUrl = `https://covers.openlibrary.org/b/title/${encodeURIComponent(title)}-L.jpg`;
-      console.log('Trying Open Library search image:', searchUrl);
-      if (await validateImageUrl(searchUrl)) {
-        return searchUrl;
-      }
-    }
-
-    if (title && author) {
-      const searchQuery = encodeURIComponent(`${title} ${author}`);
-      const googleSearchUrl = `https://www.googleapis.com/books/v1/volumes?q=${searchQuery}&maxResults=1`;
-      try {
-        const response = await fetch(googleSearchUrl);
-        const data = await response.json();
-        if (data.items?.[0]?.volumeInfo?.imageLinks) {
-          const imageUrl = data.items[0].volumeInfo.imageLinks.thumbnail;
-          if (imageUrl && await validateImageUrl(imageUrl)) {
-            return imageUrl;
-          }
-        }
-      } catch (error) {
-        console.error('Error searching Google Books:', error);
-      }
-    }
-
-    if (title) {
-      try {
-        console.log('Trying Amazon scraping for:', title);
-        const amazonData = await scrapeAmazonBookData(title, author);
-        if (amazonData.cover && await validateImageUrl(amazonData.cover)) {
-          console.log('Found valid Amazon cover:', amazonData.cover);
-          return amazonData.cover;
-        }
-      } catch (error) {
-        console.error('Error getting Amazon cover:', error);
-      }
-    }
-
-    console.log('No valid cover found, using placeholder');
-    return '/placeholder-book.svg';
+    // Fallback to placeholder
+    return '/placeholder-book.jpg';
   });
 };
 
