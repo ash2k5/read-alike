@@ -42,3 +42,4 @@ Read Alike is a comprehensive book discovery platform that:
 - ESLint: For code linting
 - TypeScript: For type checking
 - Jest: For testing
+![Image](https://github.com/user-attachments/assets/f47dfcca-f77f-44c2-8a2b-5422f289f075)
