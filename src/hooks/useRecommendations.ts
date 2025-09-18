@@ -1,88 +1,45 @@
-
-import { useState, useEffect } from 'react';
-import { useUserProfile } from './useUserProfile';
-import { useBookList } from './useBookList';
-import { getBooksByGenre, getSimilarBooks } from '@/lib/bookApi';
-import { Book } from '@/types';
-import { books as mockBooks } from '@/data/mockData';
+import { useQuery } from '@tanstack/react-query';
+import { useUserBooks } from './useUserBooks';
+import { enhancedSearchBooks, getTrendingBooks } from '@/services/enhancedBookApi';
+import { generateRecommendations, RecommendationScore } from '@/services/recommendations';
 
 export function useRecommendations() {
-  const { profile } = useUserProfile();
-  const { bookLists } = useBookList();
-  const [recommendations, setRecommendations] = useState<Book[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<Error | null>(null);
+  const { userBooks } = useUserBooks();
 
-  useEffect(() => {
-    async function fetchRecommendations() {
-      try {
-        setLoading(true);
-        let recommendedBooks: Book[] = [];
-        
-        
-        if (profile?.favorite_genres && profile.favorite_genres.length > 0) {
-          
-          const randomGenre = profile.favorite_genres[
-            Math.floor(Math.random() * profile.favorite_genres.length)
-          ];
-          
-          
-          const genreBooks = await getBooksByGenre(randomGenre);
-          if (genreBooks.length > 0) {
-            recommendedBooks = [...recommendedBooks, ...genreBooks];
-          }
-        }
-        
-        
-        const readBookIds = bookLists
-          .filter(item => item.status === 'completed')
-          .map(item => item.book_id);
-        
-        
-        if (readBookIds.length > 0) {
-          
-          const randomBookId = readBookIds[Math.floor(Math.random() * readBookIds.length)];
-          const randomBook = mockBooks.find(book => book.id === randomBookId);
-          
-          if (randomBook) {
-            const similarBooks = await getSimilarBooks(randomBook);
-            if (similarBooks.length > 0) {
-              recommendedBooks = [...recommendedBooks, ...similarBooks];
-            }
-          }
-        }
-        
-        
-        if (recommendedBooks.length === 0) {
-          recommendedBooks = mockBooks.slice(0, 5);
-        }
-        
-        
-        const userBookIds = bookLists.map(item => item.book_id);
-        const uniqueRecommendations = recommendedBooks
-          .filter((book, index, self) => 
-            !userBookIds.includes(book.id) && 
-            index === self.findIndex(b => b.id === book.id)
-          )
-          .slice(0, 10); 
-        
-        setRecommendations(uniqueRecommendations);
-      } catch (err) {
-        console.error('Error fetching recommendations:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch recommendations'));
-        
-        setRecommendations(mockBooks.slice(0, 5));
-      } finally {
-        setLoading(false);
+  const { data: recommendations = [], isLoading } = useQuery({
+    queryKey: ['recommendations', userBooks.length],
+    queryFn: async (): Promise<RecommendationScore[]> => {
+      if (userBooks.length === 0) {
+        const trendingBooks = await getTrendingBooks(12);
+        return generateRecommendations([], trendingBooks, 8);
       }
-    }
-    
-    fetchRecommendations();
-  }, [profile, bookLists]);
+
+      const likedBooks = userBooks.filter(ub => (ub.rating || 0) >= 4);
+
+      if (likedBooks.length === 0) {
+        const popularBooks = await enhancedSearchBooks('award winning fiction', 24);
+        return generateRecommendations(userBooks, popularBooks, 8);
+      }
+
+      // Enhanced recommendation logic based on user preferences
+      const favoriteAuthors = [...new Set(likedBooks.map(ub => ub.book_author))];
+      const searchPromises = [
+        ...favoriteAuthors.slice(0, 2).map(author => enhancedSearchBooks(author, 15)),
+        enhancedSearchBooks('bestseller fiction 2024', 20),
+        enhancedSearchBooks('award winning books', 15),
+      ];
+
+      const results = await Promise.all(searchPromises);
+      const allCandidates = results.flat();
+
+      return generateRecommendations(userBooks, allCandidates, 8);
+    },
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+  });
 
   return {
     recommendations,
-    loading,
-    error
+    isLoading,
   };
 }

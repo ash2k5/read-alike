@@ -1,125 +1,179 @@
-
 import { useState, useEffect } from "react";
-import { Navbar } from "@/components/navbar";
-import { BookGrid } from "@/components/book-grid";
-import { GenreSelector } from "@/components/genre-selector";
-import { books, genres } from "@/data/mockData";
-import { Book } from "@/types";
-import { Search as SearchIcon } from "lucide-react";
-import { searchBooks, getBooksByGenre } from "@/lib/bookApi";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { Book, Search as SearchIcon, User, LogOut, X } from "lucide-react";
+import { enhancedSearchBooks, getTrendingBooks } from "@/services/enhancedBookApi";
+import BookCard from "@/components/book/BookCard";
+import { useAuth } from "@/hooks/useAuth";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const Search = () => {
+  const { user, signOut } = useAuth();
   const [query, setQuery] = useState("");
-  const [selectedGenreId, setSelectedGenreId] = useState<string | undefined>(undefined);
-  const [searchResults, setSearchResults] = useState<Book[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
-  
-  const handleSearch = async () => {
-    if (!query && !selectedGenreId) {
-      setSearchResults([]);
-      setHasSearched(false);
-      return;
-    }
-    
-    try {
-      let results: Book[] = [];
-      
-      if (query) {
-        results = await searchBooks(query);
-      } else if (selectedGenreId) {
-        const genre = genres.find(g => g.id === selectedGenreId);
-        if (genre) {
-          results = await getBooksByGenre(genre.name);
-        }
-      }
-      
-      setSearchResults(results);
-      setHasSearched(true);
-    } catch (error) {
-      console.error('Error searching books:', error);
-      setSearchResults([]);
-      setHasSearched(true);
-    }
+  const debouncedQuery = useDebounce(query, 500);
+
+  // Search books based on debounced query
+  const { data: books = [], isLoading, error } = useQuery({
+    queryKey: ["books", debouncedQuery],
+    queryFn: () => enhancedSearchBooks(debouncedQuery, 24),
+    enabled: !!debouncedQuery && debouncedQuery.length >= 2,
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+  });
+
+  // Get trending books for initial state
+  const { data: trendingBooks = [], isLoading: trendingLoading } = useQuery({
+    queryKey: ['trending-books'],
+    queryFn: () => getTrendingBooks(16),
+    staleTime: 60 * 60 * 1000, // 1 hour
+    refetchOnWindowFocus: false,
+  });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Debounced search handles this automatically
   };
-  
+
+  const clearSearch = () => {
+    setQuery("");
+  };
+
+  const showResults = debouncedQuery.length >= 2;
+  const displayBooks = showResults ? books : trendingBooks;
+  const displayLoading = showResults ? isLoading : trendingLoading;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <section className="mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center font-serif">Search Books</h1>
-          
-          <div className="max-w-3xl mx-auto bg-white p-6 rounded-xl shadow-sm mb-8">
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-                  Search by title, author, or description
-                </label>
-                <div className="relative">
-                  <input
-                    id="search"
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search books..."
-                    className="block w-full px-4 py-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-book-purple focus:border-book-purple"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  />
-                  <SearchIcon className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-              </div>
-              
-              <div>
-                <label htmlFor="genre" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter by genre (optional)
-                </label>
-                <GenreSelector 
-                  onSelect={setSelectedGenreId} 
-                  selectedGenreId={selectedGenreId} 
-                />
-              </div>
-              
-              <button
-                onClick={handleSearch}
-                className="w-full bg-book-purple hover:bg-book-purple-dark text-white font-medium py-2.5 px-4 rounded-md transition"
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center space-x-2">
+              <Book className="h-8 w-8 text-blue-600" />
+              <h1 className="text-2xl font-bold text-gray-900">ReadAlike</h1>
+            </Link>
+
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
               >
-                Search
-              </button>
-            </div>
-          </div>
-          
-          {hasSearched && (
-            <div>
-              {searchResults.length > 0 ? (
-                <BookGrid 
-                  books={searchResults} 
-                  title={`Search Results (${searchResults.length})`}
-                  variant="horizontal"
-                />
+                Home
+              </Link>
+
+              {user ? (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center space-x-1 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    <User className="h-4 w-4" />
+                    <span>My Library</span>
+                  </Link>
+                  <button
+                    onClick={signOut}
+                    className="flex items-center space-x-1 text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </>
               ) : (
-                <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-                  <h3 className="text-xl font-medium text-gray-900 mb-2">No books found</h3>
-                  <p className="text-gray-600">
-                    Try adjusting your search terms or filters to find what you're looking for.
-                  </p>
-                </div>
+                <Link
+                  to="/auth"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Sign In
+                </Link>
               )}
             </div>
-          )}
-        </section>
-      </main>
-      
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-8">
-        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-gray-500 text-sm">
-              © 2025 ReadAlike. All rights reserved.
-            </p>
           </div>
         </div>
-      </footer>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto mb-8">
+          <form onSubmit={handleSearch} className="relative">
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search for books, authors, or genres..."
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                autoComplete="off"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Search status indicator */}
+            {query.length > 0 && query.length < 2 && (
+              <p className="text-sm text-gray-500 mt-2">Type at least 2 characters to search</p>
+            )}
+
+            {isLoading && debouncedQuery && (
+              <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-4 mt-1 z-10">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-gray-600">Searching...</span>
+                </div>
+              </div>
+            )}
+          </form>
+        </div>
+
+        {/* Results section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              {showResults ? `Search Results for "${debouncedQuery}"` : 'Trending Books'}
+            </h2>
+            {displayBooks.length > 0 && (
+              <span className="text-sm text-gray-500">
+                {displayBooks.length} books found
+              </span>
+            )}
+          </div>
+
+          {displayLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden animate-pulse">
+                  <div className="w-full h-64 bg-gray-200"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-red-600">Error loading books. Please try again.</p>
+            </div>
+          ) : displayBooks.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {displayBooks.map((book) => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          ) : showResults ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">No books found for "{debouncedQuery}"</p>
+              <p className="text-sm text-gray-500 mt-2">Try different keywords or check spelling</p>
+            </div>
+          ) : null}
+        </div>
+      </main>
     </div>
   );
 };
