@@ -1,0 +1,72 @@
+name: Auto Commit During Work Hours
+
+on:
+  schedule:
+    # Every 4 hours during work hours (8 AM - 6 PM EDT)
+    # 12:00, 16:00, 20:00, 00:00 UTC (8 AM, 12 PM, 4 PM, 8 PM EDT)
+    - cron: '0 12,16,20,0 * * 1-5'  # Monday-Friday only
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Check for changes
+      id: check_changes
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "changes=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Commit changes by category
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        # Function to commit changes in a specific directory
+        commit_changes() {
+          local dir="$1"
+          local message="$2"
+
+          if [ -n "$(git status --porcelain $dir)" ]; then
+            git add "$dir"
+            git commit -m "$message" || true
+            echo "Committed: $message"
+          fi
+        }
+
+        # Commit by logical groups
+        commit_changes "src/components/" "Update components"
+        commit_changes "src/pages/" "Update pages"
+        commit_changes "src/hooks/" "Update hooks"
+        commit_changes "src/services/" "Update services"
+        commit_changes "src/utils/" "Update utilities"
+        commit_changes "src/constants/" "Update constants"
+        commit_changes "backend/" "Update backend"
+
+        # Commit any remaining files
+        if [ -n "$(git status --porcelain)" ]; then
+          git add .
+          git commit -m "Update config and misc files" || true
+          echo "Committed: remaining files"
+        fi
+
+    - name: Push changes
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        git push origin main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

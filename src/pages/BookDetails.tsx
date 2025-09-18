@@ -1,246 +1,135 @@
-
-import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { Navbar } from "@/components/navbar";
-import { Rating } from "@/components/ui/rating";
-import { BookGrid } from "@/components/book-grid";
-import { Book } from "@/types";
-import { books } from "@/data/mockData";
-import { ArrowLeft, Heart, Share2 } from "lucide-react";
-import { getBookById, getSimilarBooks } from "@/lib/bookApi";
-import { BookStoreLinks } from "@/components/book/book-store-links";
-import { toast } from "@/components/ui/sonner";
+import { useParams, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Book, ArrowLeft, Star, ExternalLink } from "lucide-react";
+import { getEnhancedBookById } from "@/services/enhancedBookApi";
+import BookActions from "@/components/book/BookActions";
 
 const BookDetails = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const [book, setBook] = useState<Book | null>(null);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [similarBooks, setSimilarBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  useEffect(() => {
-    async function fetchBookDetails() {
-      setLoading(true);
-      
-      try {
-        if (id) {
-          const apiBook = await getBookById(id);
-          
-          if (apiBook) {
-            setBook(apiBook);
-            
-            const similar = await getSimilarBooks(apiBook);
-            setSimilarBooks(similar);
-            setLoading(false);
-            return;
-          }
-        }
-        
-        const foundBook = books.find(b => b.id === id);
-        setBook(foundBook || null);
-        
-        if (foundBook) {
-          const genreIds = foundBook.genre.map(g => g.id);
-          const similar = books
-            .filter(b => 
-              b.id !== foundBook.id && 
-              b.genre.some(g => genreIds.includes(g.id))
-            )
-            .slice(0, 5);
-          setSimilarBooks(similar);
-        }
-      } catch (error) {
-        console.error("Error fetching book details:", error);
-        toast.error("Failed to load book details");
-        
-        const foundBook = books.find(b => b.id === id);
-        setBook(foundBook || null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    fetchBookDetails();
-  }, [id]);
-  
-  if (loading) {
+
+  const { data: book, isLoading, error } = useQuery({
+    queryKey: ["book", id],
+    queryFn: () => getEnhancedBookById(id!),
+    enabled: !!id,
+    staleTime: 60 * 60 * 1000, // 1 hour
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center justify-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-book-purple"></div>
-          </div>
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
-  
-  if (!book) {
+
+  if (error || !book) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Book Not Found</h1>
-            <p className="text-gray-600 mb-8">The book you're looking for doesn't exist or has been removed.</p>
-            <Link to="/browse" className="text-book-purple hover:underline">
-              Browse all books
-            </Link>
-          </div>
-        </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Book not found</h2>
+          <Link to="/" className="text-blue-600 hover:underline">
+            Go back home
+          </Link>
+        </div>
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <main className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back button */}
-        <div className="mb-6">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="inline-flex items-center text-gray-600 hover:text-book-purple"
-          >
-            <ArrowLeft size={16} className="mr-1" />
-            <span>Back</span>
-          </button>
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <Link to="/" className="flex items-center space-x-2">
+              <Book className="h-8 w-8 text-blue-600" />
+              <h1 className="text-2xl font-bold text-gray-900">ReadAlike</h1>
+            </Link>
+            <Link
+              to="/search"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            >
+              Search Books
+            </Link>
+          </div>
         </div>
-        
-        {/* Book details */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-12">
-          <div className="p-6 md:p-8">
-            <div className="flex flex-col md:flex-row gap-8">
-              {/* Book cover */}
-              <div className="flex-shrink-0">
-                <img 
-                  src={book.cover} 
-                  alt={book.title} 
-                  className="w-48 h-72 object-cover rounded-lg shadow-md mx-auto md:mx-0" 
-                />
-                
-                <div className="mt-4 flex justify-center md:justify-start space-x-2">
-                  <button 
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className={`flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                      isFavorite 
-                        ? "bg-red-50 text-red-600" 
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    <Heart 
-                      size={16} 
-                      className={`mr-1.5 ${isFavorite ? "fill-red-500" : ""}`} 
-                    />
-                    {isFavorite ? "Saved" : "Save"}
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success('Link copied to clipboard');
-                    }}
-                    className="bg-gray-100 text-gray-700 hover:bg-gray-200 p-2 rounded-full"
-                  >
-                    <Share2 size={16} />
-                  </button>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <Link
+          to="/"
+          className="inline-flex items-center space-x-2 text-blue-600 hover:underline mb-6"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to home</span>
+        </Link>
+
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="md:flex">
+            <div className="md:w-1/3">
+              <img
+                src={book.cover}
+                alt={book.title}
+                className="w-full h-96 md:h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/placeholder-book.jpg';
+                }}
+              />
+            </div>
+
+            <div className="md:w-2/3 p-6">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {book.title}
+              </h1>
+              <p className="text-xl text-gray-600 mb-4">{book.author}</p>
+
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="flex items-center space-x-1">
+                  <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                  <span className="text-lg font-medium">{book.rating}</span>
                 </div>
+                {book.year > 0 && (
+                  <span className="text-gray-600">{book.year}</span>
+                )}
               </div>
-              
-              {/* Book info */}
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2 font-serif">{book.title}</h1>
-                <p className="text-xl text-gray-700 mb-4">by {book.author}</p>
-                
-                <div className="flex items-center mb-6">
-                  <Rating value={book.rating} showValue size="lg" />
-                  <span className="ml-2 text-gray-500 text-sm">({book.reviews?.length || 0} reviews)</span>
-                </div>
-                
-                <div className="mb-6">
-                  <h2 className="text-gray-700 font-medium mb-2">About this book</h2>
-                  <p className="text-gray-600">{book.description}</p>
-                </div>
-                
-                <div className="mb-6">
-                  <h2 className="text-gray-700 font-medium mb-2">Genres</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {book.genre.map(genre => (
-                      <Link 
-                        key={genre.id}
-                        to={`/browse?genre=${genre.id}`}
-                        className="bg-book-softPurple text-book-purple-dark px-3 py-1 rounded-full text-sm hover:bg-book-purple/20"
-                      >
-                        {genre.name}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Store links - using our new component */}
-                <BookStoreLinks book={book} />
+
+              <div className="flex flex-wrap gap-2 mb-6">
+                {book.genre.map((g, index) => (
+                  <span
+                    key={index}
+                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                  >
+                    {g}
+                  </span>
+                ))}
               </div>
+
+              <div className="mb-6">
+                <BookActions book={book} />
+              </div>
+
+              <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-3">
+                  Description
+                </h2>
+                <p className="text-gray-700 leading-relaxed">{book.description}</p>
+              </div>
+
+              {book.amazonLink && (
+                <a
+                  href={book.amazonLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-md"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span>View on Amazon</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
-        
-        {/* Reviews section */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Reviews</h2>
-          
-          {book.reviews && book.reviews.length > 0 ? (
-            <div className="space-y-6">
-              {book.reviews.map(review => (
-                <div key={review.id} className="bg-white p-6 rounded-xl shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-book-purple-light rounded-full flex items-center justify-center text-book-purple-dark font-bold">
-                        {review.userName.charAt(0)}
-                      </div>
-                      <div className="ml-3">
-                        <p className="font-medium text-gray-900">{review.userName}</p>
-                        <p className="text-sm text-gray-500">{review.date}</p>
-                      </div>
-                    </div>
-                    <Rating value={review.rating} />
-                  </div>
-                  <p className="text-gray-700">{review.text}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-white rounded-xl">
-              <p className="text-gray-500">No reviews yet for this book.</p>
-            </div>
-          )}
-        </section>
-        
-        {/* Similar books section */}
-        {similarBooks.length > 0 && (
-          <section className="mb-12">
-            <BookGrid 
-              books={similarBooks} 
-              title="Similar Books You Might Enjoy" 
-              description="Based on this book's genre and author"
-              variant="default"
-            />
-          </section>
-        )}
       </main>
-      
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-8">
-        <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-gray-500 text-sm">
-              © 2025 ReadAlike. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
