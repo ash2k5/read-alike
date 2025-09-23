@@ -1,17 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
-import { AuthProvider } from "./hooks/useAuthApi";
+import { AuthProvider } from "./features/auth/useAuthApi";
 import Home from "./pages/Home";
-import Search from "./pages/Search";
-import BookDetails from "./pages/BookDetails";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
+import Search from "./features/books/Search";
+import BookDetails from "./features/books/BookDetails";
+import Auth from "./features/auth/Auth";
+import Dashboard from "./features/dashboard/Dashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 1,
     },

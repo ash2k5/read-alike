@@ -1,185 +1,102 @@
 # ReadAlike - Book Recommendation Platform
 
-A modern, full-stack book recommendation platform built with React, TypeScript, Node.js, and PostgreSQL.
+A modern book recommendation platform built with React, TypeScript, and Supabase.
 
-## 🚀 Live Demo
+## Live Demo
 
-- **Frontend**: [Deployed on Vercel](https://your-app.vercel.app)
-- **Backend API**: [Deployed on Railway](https://your-backend.railway.app)
+- Frontend: [Deployed on Vercel](https://your-app.vercel.app)
+- Backend API: [Deployed on Railway](https://your-backend.railway.app)
 
-## ✨ Features
+## Features
 
-- **📚 Book Search**: Search 30+ million books with instant results
-- **🔐 User Authentication**: Secure JWT-based authentication
-- **📖 Personal Library**: Track reading progress (Want to Read, Reading, Completed)
-- **⭐ Rating System**: Rate and review your favorite books
-- **🎯 Smart Recommendations**: AI-powered personalized book suggestions
-- **📊 Reading Stats**: Track your reading goals and progress
-- **💨 Performance**: Optimized with caching and modern architecture
+- Book Search: Search millions of books with instant results
+- User Authentication: Secure authentication system
+- Personal Library: Track reading progress (Want to Read, Reading, Completed)
+- Rating System: Rate and review books
+- Smart Recommendations: Content-based book suggestions using TF-IDF similarity
+- Reading Statistics: Track reading goals and progress
+- Performance Optimized: Client-side caching and modern architecture
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
-- **React 18** with TypeScript
-- **Vite** for blazing-fast development
-- **Tailwind CSS** for styling
-- **TanStack Query** for data fetching
-- **React Router** for navigation
+- React 18 with TypeScript
+- Vite for development and build
+- Tailwind CSS for styling
+- TanStack Query for data fetching and caching
+- React Router for navigation
 
-### Backend
-- **Node.js** with Express
-- **PostgreSQL** database
-- **JWT** authentication
-- **bcrypt** for password hashing
-- **Open Library API** integration
+### Backend & Database
+- Supabase for backend services
+- PostgreSQL database
+- Real-time subscriptions
+- Row Level Security (RLS)
 
-### Deployment
-- **Frontend**: Vercel (optimized for React/Vite)
-- **Backend**: Railway (Node.js + PostgreSQL)
-- **Database**: Railway PostgreSQL
-- **CDN**: Vercel Edge Network
+### APIs
+- Google Books API integration
+- Open Library API integration
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL (or use Railway's managed database)
+- Supabase account
 
-### Local Development
+### Installation
 
-1. **Clone the repository**
+1. Clone the repository
    ```bash
    git clone https://github.com/yourusername/read-alike.git
    cd read-alike
    ```
 
-2. **Setup Backend**
+2. Install dependencies
    ```bash
-   cd backend
    npm install
-   cp .env.example .env
-   # Configure your environment variables
-   npm run migrate  # Set up database
-   npm run dev     # Start backend server
    ```
 
-3. **Setup Frontend**
+3. Setup environment variables
    ```bash
-   cd ../
-   npm install
    cp .env.example .env.local
-   # Configure VITE_API_URL
-   npm run dev     # Start frontend server
    ```
 
-### Environment Variables
+4. Configure environment variables in `.env.local`
+   ```env
+   VITE_SUPABASE_URL=your-supabase-url
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+   VITE_GOOGLE_BOOKS_API_KEY=your-google-books-api-key
+   ```
 
-**Backend (.env)**
-```env
-DATABASE_URL=postgresql://username:password@localhost:5432/readalike
-JWT_SECRET=your-super-secret-jwt-key
-FRONTEND_URL=http://localhost:8080
-NODE_ENV=development
-PORT=3001
-```
-
-**Frontend (.env.local)**
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-## 🚢 Deployment
-
-### Railway Backend Deployment
-
-1. **Connect to Railway**
+5. Start the development server
    ```bash
-   # Install Railway CLI
-   npm install -g @railway/cli
-
-   # Login and deploy
-   railway login
-   railway init
-   railway up
+   npm run dev
    ```
 
-2. **Add PostgreSQL**
-   - Go to Railway dashboard
-   - Add PostgreSQL service
-   - Copy DATABASE_URL to environment variables
+## Deployment
 
-3. **Environment Variables**
-   ```
-   DATABASE_URL=postgresql://...  # From Railway PostgreSQL
-   JWT_SECRET=your-production-secret
-   FRONTEND_URL=https://your-app.vercel.app
-   NODE_ENV=production
-   ```
+### Vercel Deployment
 
-### Vercel Frontend Deployment
+1. Connect your repository to Vercel
+2. Configure environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
 
-1. **Connect to Vercel**
-   ```bash
-   # Install Vercel CLI
-   npm install -g vercel
+## Database Schema
 
-   # Deploy
-   vercel
-   ```
+The application uses Supabase with the following main tables:
 
-2. **Environment Variables**
-   ```
-   VITE_API_URL=https://your-backend.railway.app/api
-   ```
+- `user_profiles`: User information and preferences
+- `user_books`: User's book library with status and ratings
 
-## 📝 API Documentation
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user
-- `PUT /api/auth/profile` - Update profile
-
-### Books
-- `GET /api/books/search?q=query` - Search books
-- `GET /api/books/trending` - Get trending books
-- `GET /api/books/:id` - Get book details
-
-### User Library
-- `GET /api/users/books` - Get user's books
-- `POST /api/users/books` - Add book to library
-- `PUT /api/users/books/:id` - Update book status/rating
-- `DELETE /api/users/books/:id` - Remove book from library
-- `GET /api/users/stats` - Get reading statistics
-
-### Recommendations
-- `GET /api/recommendations` - Get personalized recommendations
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-Frontend (Vercel)     Backend (Railway)     Database (Railway)
-     │                      │                      │
-  React App    ←→    Express API    ←→    PostgreSQL
-     │                      │                      │
-  TanStack Query      JWT Auth           Book Cache
-  Tailwind CSS        Rate Limiting      User Data
+Frontend (React/Vite) ←→ Supabase (Database + Auth) ←→ External APIs (Google Books, Open Library)
 ```
 
-## 🔒 Security Features
+## Key Features Implementation
 
-- **JWT Authentication** with secure token storage
-- **Password Hashing** with bcrypt (12 rounds)
-- **Rate Limiting** (100 requests per 15 minutes)
-- **CORS Protection** with domain whitelist
-- **SQL Injection Prevention** with parameterized queries
-- **XSS Protection** with Helmet.js
-
-## 📊 Performance Optimizations
-
-- **Frontend Caching** with TanStack Query
-- **Backend Caching** with node-cache
-- **Database Indexing** on frequently queried fields
-- **CDN Delivery** via Vercel Edge Network
-- **Compression** with gzip
-- **Lazy Loading** for images and components
+- **Authentication**: Supabase Auth with user profiles
+- **Book Search**: Integrated Google Books and Open Library APIs
+- **Recommendations**: TF-IDF based content similarity algorithm
+- **Caching**: Client-side caching with TanStack Query
+- **Real-time Updates**: Supabase real-time subscriptions

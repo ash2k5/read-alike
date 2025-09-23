@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { Book, User, LogOut } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getTrendingBooks } from "@/services/enhancedBookApi";
-import BookCard from "@/components/book/BookCard";
-import { useAuth } from "@/hooks/useAuth";
+import { getTrendingBooks } from "@/lib/api/enhancedBookApi";
+import BookCard from "@/features/books/components/BookCard";
+import { useAuth } from "@/features/auth/useAuth";
 
 const Home = () => {
   const { user, signOut } = useAuth();
